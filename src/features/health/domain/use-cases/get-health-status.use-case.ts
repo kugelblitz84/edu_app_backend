@@ -1,4 +1,4 @@
-import { SystemStatusService } from '../contracts/system-status.provider';
+import { SystemStatusService } from '../contracts/system-status-abstract.service';
 import { HealthStatus } from '../entities/health-status.entity';
 
 export class GetHealthStatusUseCase {

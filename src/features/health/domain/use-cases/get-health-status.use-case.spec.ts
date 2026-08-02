@@ -1,7 +1,7 @@
 import {
   SystemStatusService,
   SystemStatusSnapshot,
-} from '../contracts/system-status.provider';
+} from '../contracts/system-status-abstract.service';
 import { GetHealthStatusUseCase } from './get-health-status.use-case';
 
 class FakeSystemStatusService extends SystemStatusService {

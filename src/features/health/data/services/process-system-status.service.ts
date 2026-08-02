@@ -2,7 +2,7 @@ import { Injectable } from '@nestjs/common';
 import {
   SystemStatusService,
   SystemStatusSnapshot,
-} from '../../domain/contracts/system-status.provider';
+} from '../../domain/contracts/system-status-abstract.service';
 
 @Injectable()
 export class ProcessSystemStatusService extends SystemStatusService {

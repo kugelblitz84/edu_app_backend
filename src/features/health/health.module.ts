@@ -1,6 +1,6 @@
 import { Module } from '@nestjs/common';
-import { ProcessSystemStatusService } from './data/providers/process-system-status.provider';
-import { SystemStatusService } from './domain/contracts/system-status.provider';
+import { ProcessSystemStatusService } from './data/services/process-system-status.service';
+import { SystemStatusService } from './domain/contracts/system-status-abstract.service';
 import { GetHealthStatusUseCase } from './domain/use-cases/get-health-status.use-case';
 import { HealthController } from './presentation/controllers/health.controller';
 
