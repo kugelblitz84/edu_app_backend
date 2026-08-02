@@ -1,11 +1,11 @@
 import { Injectable } from '@nestjs/common';
 import {
-  SystemStatusProvider,
+  SystemStatusService,
   SystemStatusSnapshot,
 } from '../../domain/contracts/system-status.provider';
 
 @Injectable()
-export class ProcessSystemStatusProvider extends SystemStatusProvider {
+export class ProcessSystemStatusService extends SystemStatusService {
   getSnapshot(): SystemStatusSnapshot {
     return {
       timestamp: new Date(),

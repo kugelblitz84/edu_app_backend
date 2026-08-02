@@ -1,6 +1,6 @@
 import { Module } from '@nestjs/common';
-import { ProcessSystemStatusProvider } from './data/providers/process-system-status.provider';
-import { SystemStatusProvider } from './domain/contracts/system-status.provider';
+import { ProcessSystemStatusService } from './data/providers/process-system-status.provider';
+import { SystemStatusService } from './domain/contracts/system-status.provider';
 import { GetHealthStatusUseCase } from './domain/use-cases/get-health-status.use-case';
 import { HealthController } from './presentation/controllers/health.controller';
 
@@ -8,14 +8,14 @@ import { HealthController } from './presentation/controllers/health.controller';
   controllers: [HealthController],
   providers: [
     {
-      provide: SystemStatusProvider,
-      useClass: ProcessSystemStatusProvider,
+      provide: SystemStatusService,
+      useClass: ProcessSystemStatusService,
     },
     {
       provide: GetHealthStatusUseCase,
-      useFactory: (provider: SystemStatusProvider) =>
+      useFactory: (provider: SystemStatusService) =>
         new GetHealthStatusUseCase(provider),
-      inject: [SystemStatusProvider],
+      inject: [SystemStatusService],
     },
   ],
 })

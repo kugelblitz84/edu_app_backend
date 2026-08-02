@@ -1,10 +1,10 @@
 import {
-  SystemStatusProvider,
+  SystemStatusService,
   SystemStatusSnapshot,
 } from '../contracts/system-status.provider';
 import { GetHealthStatusUseCase } from './get-health-status.use-case';
 
-class FakeSystemStatusProvider extends SystemStatusProvider {
+class FakeSystemStatusService extends SystemStatusService {
   getSnapshot(): SystemStatusSnapshot {
     return {
       timestamp: new Date('2026-08-02T00:00:00.000Z'),
@@ -16,7 +16,7 @@ class FakeSystemStatusProvider extends SystemStatusProvider {
 
 describe('GetHealthStatusUseCase', () => {
   it('returns a healthy system snapshot', () => {
-    const useCase = new GetHealthStatusUseCase(new FakeSystemStatusProvider());
+    const useCase = new GetHealthStatusUseCase(new FakeSystemStatusService());
 
     const result = useCase.execute();
 
