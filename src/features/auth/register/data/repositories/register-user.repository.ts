@@ -42,8 +42,26 @@ export class PrismaRegisterUserRepository implements RegisterUserRepository {
 
       return this.toEntity(createdUser);
     } catch (error) {
-      if (this.isUniqueViolation(error)) {
-        throw new RegistrationConflictError();
+      if (
+        error instanceof Prisma.PrismaClientKnownRequestError &&
+        error.code === 'P2002'
+      ) {
+        const target = error.meta?.target;
+        const fields = Array.isArray(target)
+          ? target.map(String)
+          : typeof target === 'string'
+            ? [target]
+            : [];
+
+        if (fields.includes('email')) {
+          throw RegistrationConflictError.email();
+        }
+
+        if (fields.includes('username')) {
+          throw RegistrationConflictError.username();
+        }
+
+        throw RegistrationConflictError.unknown();
       }
 
       throw error;
@@ -59,14 +77,5 @@ export class PrismaRegisterUserRepository implements RegisterUserRepository {
       status: row.status,
       createdAt: row.createdAt,
     };
-  }
-
-  private isUniqueViolation(
-    error: unknown,
-  ): error is Prisma.PrismaClientKnownRequestError {
-    return (
-      error instanceof Prisma.PrismaClientKnownRequestError &&
-      error.code === 'P2002'
-    );
   }
 }

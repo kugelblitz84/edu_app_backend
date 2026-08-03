@@ -6,8 +6,34 @@ export class RegistrationValidationError extends DomainError {
   }
 }
 
+export type RegistrationConflictType = 'email' | 'username' | 'unknown';
+
 export class RegistrationConflictError extends DomainError {
-  constructor() {
-    super('An account with that email or username already exists.');
+  private constructor(
+    public readonly conflictType: RegistrationConflictType,
+    message: string,
+  ) {
+    super(message);
+  }
+
+  static email(): RegistrationConflictError {
+    return new RegistrationConflictError(
+      'email',
+      'An account with that email already exists.',
+    );
+  }
+
+  static username(): RegistrationConflictError {
+    return new RegistrationConflictError(
+      'username',
+      'An account with that username already exists.',
+    );
+  }
+
+  static unknown(): RegistrationConflictError {
+    return new RegistrationConflictError(
+      'unknown',
+      'Unknown error occured while registering user. Please try again later.',
+    );
   }
 }
