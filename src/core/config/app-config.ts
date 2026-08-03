@@ -6,6 +6,7 @@ export interface AppConfig {
   nodeEnv: NodeEnvironment;
   port: number;
   corsOrigins: string[];
+  databaseUrl: string;
 }
 
 function parseNodeEnvironment(value: string | undefined): NodeEnvironment {
@@ -42,6 +43,9 @@ export function loadAppConfig(): AppConfig {
     nodeEnv: parseNodeEnvironment(process.env.NODE_ENV),
     port: parsePort(process.env.PORT),
     corsOrigins: parseCorsOrigins(process.env.CORS_ORIGINS),
+    databaseUrl:
+      process.env.DATABASE_URL ??
+      'postgres://postgres:postgres@localhost:5432/edu_app_sadi',
   };
 }
 

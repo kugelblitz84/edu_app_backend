@@ -1,0 +1,45 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum PlatformRole {
+  GUEST
+  GLOBAL_ADMIN
+
+  @@map("platform_role")
+}
+
+enum UserStatus {
+  ACTIVE
+  SUSPENDED
+  BANNED
+  DELETED
+
+  @@map("user_status")
+}
+
+model User {
+  id              String       @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  email           String       @unique @db.VarChar(320)
+  username        String       @unique @db.VarChar(30)
+  passwordHash    String       @map("password_hash")
+  fullName        String       @map("full_name") @db.VarChar(160)
+  avatarUrl       String?      @map("avatar_url")
+  platformRole    PlatformRole @default(GUEST) @map("platform_role")
+  status          UserStatus   @default(ACTIVE)
+  emailVerifiedAt DateTime?    @map("email_verified_at") @db.Timestamptz
+  lastLoginAt     DateTime?    @map("last_login_at") @db.Timestamptz
+  createdAt       DateTime     @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt       DateTime     @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
+  deletedAt       DateTime?    @map("deleted_at") @db.Timestamptz
+
+  @@index([platformRole])
+  @@index([status])
+  @@index([username])
+  @@index([createdAt])
+  @@map("users")
+}
