@@ -120,7 +120,7 @@ export function loadAppConfig(): AppConfig {
   };
 }
 
-export const appConfigProvider = {
+export const appConfigProvider = { 
   provide: APP_CONFIG,
   useFactory: loadAppConfig,
 };

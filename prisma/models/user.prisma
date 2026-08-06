@@ -1,11 +1,3 @@
-generator client {
-  provider = "prisma-client-js"
-}
-
-datasource db {
-  provider = "postgresql"
-}
-
 enum PlatformRole {
   GUEST
   GLOBAL_ADMIN
@@ -36,6 +28,8 @@ model User {
   createdAt       DateTime     @default(now()) @map("created_at") @db.Timestamptz
   updatedAt       DateTime     @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
   deletedAt       DateTime?    @map("deleted_at") @db.Timestamptz
+
+  passwordResets PasswordReset[]
 
   @@index([platformRole])
   @@index([status])
