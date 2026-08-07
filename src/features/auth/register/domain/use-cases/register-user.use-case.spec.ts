@@ -1,3 +1,4 @@
+import { NormalizeAndValidateServiceImpl } from '../../data/services/normalize-and-validate.service';
 import { PasswordHasher } from '../contracts/password-hasher.service';
 import {
   CreateUserRecord,
@@ -35,6 +36,7 @@ describe(RegisterUserUseCase.name, () => {
     const useCase = new RegisterUserUseCase(
       repository,
       new FakePasswordHasher(),
+      new NormalizeAndValidateServiceImpl(),
     );
 
     const user = await useCase.execute({
@@ -57,6 +59,7 @@ describe(RegisterUserUseCase.name, () => {
     const useCase = new RegisterUserUseCase(
       new FakeRegisterUserRepository(),
       new FakePasswordHasher(),
+      new NormalizeAndValidateServiceImpl(),
     );
 
     await expect(

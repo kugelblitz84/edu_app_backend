@@ -2,8 +2,8 @@ import { INestApplication, VersioningType } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
 import request from 'supertest';
 import { App } from 'supertest/types';
-import { AppModule } from '../src/app/app.module';
-import type { HealthResponseDto } from '../src/features/health/presentation/dto/health-response.dto';
+import { AppModule } from '../../src/app/app.module';
+import type { HealthResponseDto } from '../../src/features/health/presentation/dto/health-response.dto';
 
 describe('Application (e2e)', () => {
   let app: INestApplication<App>;
