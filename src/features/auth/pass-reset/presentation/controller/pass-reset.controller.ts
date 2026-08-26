@@ -2,6 +2,7 @@ import { PassResetErrorType, PassResetErrors } from '../../domain/errors/pass-re
 import { PassResetRepository } from '../../domain/contracts/pass-reset.repository';
 import { PinDigestService } from '../services/pin-digest.service';
 import { PassResetMailerService } from '../services/pass-reset-mailer.service';
+import { PassResetUseCase } from '';
 
 import { Controller } from '@nestjs/common';
 
