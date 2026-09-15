@@ -1,0 +1,29 @@
+enum InstitutionStatus {
+  ACTIVE
+  SUSPENDED
+  PENDING_APPROVAL
+  DELETED
+  ARCHIVED
+
+  @@map("institution_status")
+}
+
+model Institution {
+  id              String            @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  name            String            @unique @db.VarChar(160)
+  slug            String            @unique @db.VarChar(160)
+  status          InstitutionStatus @default(PENDING_APPROVAL) @map("institution_status")
+  institutionCode String            @unique @map("institution_code") @db.VarChar(20)
+  logoUrl         String?           @map("logo_url")
+  description     String?           @db.VarChar(500)
+  createdAt       DateTime          @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt       DateTime          @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
+  createdByUserId String            @map("created_by_user_id") @db.Uuid
+  createdByUser   User              @relation(fields: [createdByUserId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  archivedAt      DateTime?         @map("archived_at") @db.Timestamptz
+
+  @@index([status])
+  @@index([createdAt])
+  @@index([createdByUserId])
+  @@map("institutions")
+}

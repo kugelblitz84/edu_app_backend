@@ -1,10 +1,10 @@
 import { createHash, randomBytes } from 'node:crypto';
+import {
+  TokenService,
+  type VerifiedAccessToken,
+} from '../../../../../core/token/token.service';
 import { PasswordVerifier } from '../../../login/domain/contracts/password-verifier.service';
 import { PasswordHasher } from '../../../register/domain/contracts/password-hasher.service';
-import {
-  AccessTokenVerifier,
-  type VerifiedAccessToken,
-} from '../contracts/access-token-verifier.service';
 import { PassResetMailerService } from '../contracts/pass-reset-mailer.service';
 import { PassResetRepository } from '../contracts/pass-reset.repository';
 import {
@@ -24,7 +24,7 @@ export class PassResetUseCase {
     private readonly repository: PassResetRepository,
     private readonly passwordHasher: PasswordHasher,
     private readonly passwordVerifier: PasswordVerifier,
-    private readonly accessTokenVerifier: AccessTokenVerifier,
+    private readonly tokenService: Pick<TokenService, 'verify'>,
     private readonly mailer: PassResetMailerService,
     private readonly resetTtlSeconds: number,
   ) {}
@@ -66,7 +66,7 @@ export class PassResetUseCase {
   }): Promise<AuthenticatedResetResult> {
     let subject: VerifiedAccessToken;
     try {
-      subject = this.accessTokenVerifier.verify(input.accessToken);
+      subject = this.tokenService.verify(input.accessToken);
     } catch {
       throw new InvalidAccessTokenError();
     }

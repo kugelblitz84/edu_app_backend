@@ -2,27 +2,26 @@ import { Module } from '@nestjs/common';
 import { APP_CONFIG, type AppConfig } from '../../../core/config/app-config';
 import { PrismaModule } from '../../../core/database/prisma.module';
 import { MailModule } from '../../../core/mail/mail.module';
+import { TokenModule } from '../../../core/token/token.module';
+import { TokenService } from '../../../core/token/token.service';
 import { ScryptPasswordVerifier } from '../login/data/services/scrypt-password-verifier.service';
 import { PasswordVerifier } from '../login/domain/contracts/password-verifier.service';
 import { ScryptPasswordHasher } from '../register/data/services/scrypt-password-hasher.service';
 import { PasswordHasher } from '../register/domain/contracts/password-hasher.service';
 import { PrismaPassResetRepository } from './data/repositories/prisma-pass-reset.repository';
 import { PassResetMailerService as PassResetMailerAdapter } from './data/services/pass-reset-mailer.service';
-import { Sha256AccessTokenVerifier } from './data/services/sha256-access-token-verifier.service';
-import { AccessTokenVerifier } from './domain/contracts/access-token-verifier.service';
 import { PassResetMailerService } from './domain/contracts/pass-reset-mailer.service';
 import { PassResetRepository } from './domain/contracts/pass-reset.repository';
 import { PassResetUseCase } from './domain/use-cases/pass-reset.usecase';
 import { PassResetController } from './presentation/controllers/pass-reset.controller';
 
 @Module({
-  imports: [PrismaModule, MailModule],
+  imports: [PrismaModule, MailModule, TokenModule],
   controllers: [PassResetController],
   providers: [
     { provide: PassResetRepository, useClass: PrismaPassResetRepository },
     { provide: PasswordHasher, useClass: ScryptPasswordHasher },
     { provide: PasswordVerifier, useClass: ScryptPasswordVerifier },
-    { provide: AccessTokenVerifier, useClass: Sha256AccessTokenVerifier },
     {
       provide: PassResetMailerService,
       useClass: PassResetMailerAdapter,
@@ -33,7 +32,7 @@ import { PassResetController } from './presentation/controllers/pass-reset.contr
         repository: PassResetRepository,
         hasher: PasswordHasher,
         verifier: PasswordVerifier,
-        tokenVerifier: AccessTokenVerifier,
+        tokenService: TokenService,
         mailer: PassResetMailerService,
         config: AppConfig,
       ) =>
@@ -41,7 +40,7 @@ import { PassResetController } from './presentation/controllers/pass-reset.contr
           repository,
           hasher,
           verifier,
-          tokenVerifier,
+          tokenService,
           mailer,
           config.auth.passwordResetTtlSeconds,
         ),
@@ -49,7 +48,7 @@ import { PassResetController } from './presentation/controllers/pass-reset.contr
         PassResetRepository,
         PasswordHasher,
         PasswordVerifier,
-        AccessTokenVerifier,
+        TokenService,
         PassResetMailerService,
         APP_CONFIG,
       ],

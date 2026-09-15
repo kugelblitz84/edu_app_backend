@@ -1,6 +1,6 @@
+import { TokenService } from '../../../../../core/token/token.service';
 import { LoginUserRepository } from '../contracts/login-user.repository';
 import { PasswordVerifier } from '../contracts/password-verifier.service';
-import { TokenGenerator } from '../contracts/token-generator.service';
 import type { LoggedInUser } from '../entities/logged-in-user.entity';
 import {
   InvalidCredentialsError,
@@ -21,7 +21,7 @@ export class LoginUseCase {
   constructor(
     private readonly repository: LoginUserRepository,
     private readonly passwordVerifier: PasswordVerifier,
-    private readonly tokenGenerator: TokenGenerator,
+    private readonly tokenService: Pick<TokenService, 'generate'>,
   ) {}
 
   async execute(
@@ -49,7 +49,7 @@ export class LoginUseCase {
       throw new LoginNotAllowedError();
     }
 
-    const tokens = this.tokenGenerator.generate({
+    const tokens = this.tokenService.generate({
       userId: user.id,
       username: user.username,
       email: user.email,

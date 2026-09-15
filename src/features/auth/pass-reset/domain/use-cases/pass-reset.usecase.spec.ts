@@ -1,10 +1,10 @@
 import { createHash } from 'node:crypto';
+import {
+  TokenService,
+  type VerifiedAccessToken,
+} from '../../../../../core/token/token.service';
 import type { PasswordVerifier } from '../../../login/domain/contracts/password-verifier.service';
 import type { PasswordHasher } from '../../../register/domain/contracts/password-hasher.service';
-import type {
-  AccessTokenVerifier,
-  VerifiedAccessToken,
-} from '../contracts/access-token-verifier.service';
 import type { PassResetMailerService } from '../contracts/pass-reset-mailer.service';
 import {
   PassResetRepository,
@@ -107,7 +107,7 @@ class FakeMailer implements PassResetMailerService {
   }
 }
 
-class FakeTokenVerifier implements AccessTokenVerifier {
+class FakeTokenVerifier implements Pick<TokenService, 'verify'> {
   subject: VerifiedAccessToken = {
     userId: USER.id,
     issuedAt: new Date(),

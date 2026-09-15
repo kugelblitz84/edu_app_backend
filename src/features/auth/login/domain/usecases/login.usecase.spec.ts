@@ -1,13 +1,13 @@
 import {
+  type AccessTokenSubject,
+  type GeneratedTokenPair,
+  TokenService,
+} from '../../../../../core/token/token.service';
+import {
   LoginUserRepository,
   type LoginUserRecord,
 } from '../contracts/login-user.repository';
 import { PasswordVerifier } from '../contracts/password-verifier.service';
-import {
-  type AccessTokenSubject,
-  type GeneratedTokenPair,
-  TokenGenerator,
-} from '../contracts/token-generator.service';
 import {
   InvalidCredentialsError,
   LoginNotAllowedError,
@@ -50,7 +50,7 @@ class FakePasswordVerifier implements PasswordVerifier {
   }
 }
 
-class FakeTokenGenerator implements TokenGenerator {
+class FakeTokenGenerator implements Pick<TokenService, 'generate'> {
   public subject?: AccessTokenSubject;
 
   generate(subject: AccessTokenSubject): GeneratedTokenPair {

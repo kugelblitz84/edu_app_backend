@@ -37,3 +37,9 @@ export class RegistrationConflictError extends DomainError {
     );
   }
 }
+
+export class InstitutionRegistrationConflictError extends DomainError {
+  constructor() {
+    super('An institution with that name or institution code already exists.');
+  }
+}
