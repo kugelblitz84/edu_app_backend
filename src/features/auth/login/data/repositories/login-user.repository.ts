@@ -25,10 +25,19 @@ export class PrismaLoginUserRepository implements LoginUserRepository {
     });
   }
 
-  async recordSuccessfulLogin(userId: string, loggedInAt: Date): Promise<void> {
+  async recordSuccessfulLogin(
+    userId: string,
+    loggedInAt: Date,
+    ipAddress?: string,
+    ipRegion?: string,
+  ): Promise<void> {
     await this.prisma.user.update({
       where: { id: userId },
-      data: { lastLoginAt: loggedInAt },
+      data: {
+        lastLoginAt: loggedInAt,
+        lastLoginIp: ipAddress,
+        lastLoginRegion: ipRegion,
+      },
       select: { id: true },
     });
   }

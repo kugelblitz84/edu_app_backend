@@ -289,9 +289,7 @@ describe('Auth module (e2e)', () => {
       expect.arrayContaining([
         'A valid email address is required.',
         'Username must be 3-30 characters and contain only letters, numbers, and underscores.',
-        'Password must be 12-128 characters long.',
-        'Password must include lowercase and uppercase letters.',
-        'Password must include at least one number.',
+        'Password must be 15-128 characters long.',
         'Registration request contains unsupported fields.',
       ]),
     );

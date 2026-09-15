@@ -1,53 +1,85 @@
-import { Injectable } from '@nestjs/common';
+import { Inject, Injectable } from '@nestjs/common';
 import { scrypt, timingSafeEqual } from 'node:crypto';
+import {
+  APP_CONFIG,
+  type AppConfig,
+} from '../../../../../core/config/app-config';
 import { PasswordVerifier } from '../../domain/contracts/password-verifier.service';
 
-const KEY_LENGTH = 64;
-const COST = 16_384;
-const BLOCK_SIZE = 8;
-const PARALLELIZATION = 1;
+const LEGACY_PARAMETERS = { cost: 16_384, blockSize: 8, parallelization: 1 };
 
 @Injectable()
 export class ScryptPasswordVerifier implements PasswordVerifier {
+  constructor(@Inject(APP_CONFIG) private readonly config: AppConfig) {}
+
   async verify(password: string, passwordHash: string): Promise<boolean> {
     const [algorithm, cost, blockSize, parallelization, salt, encodedKey] =
       passwordHash.split('$');
 
-    if (
-      algorithm !== 'scrypt' ||
-      Number(cost) !== COST ||
-      Number(blockSize) !== BLOCK_SIZE ||
-      Number(parallelization) !== PARALLELIZATION ||
-      !salt ||
-      !encodedKey
-    ) {
+    if (algorithm !== 'scrypt' || !salt || !encodedKey) {
       return false;
     }
 
     try {
       const storedKey = Buffer.from(encodedKey, 'base64url');
-      if (storedKey.length !== KEY_LENGTH) {
-        return false;
-      }
+      const parameters = {
+        cost: Number(cost),
+        blockSize: Number(blockSize),
+        parallelization: Number(parallelization),
+      };
+      const currentParameters = this.config.passwordHashing;
+      const isCurrent =
+        storedKey.length === currentParameters.keyLength &&
+        currentParameters.cost === parameters.cost &&
+        currentParameters.blockSize === parameters.blockSize &&
+        currentParameters.parallelization === parameters.parallelization;
+      const isLegacy =
+        storedKey.length === 64 &&
+        [LEGACY_PARAMETERS].some(
+          (supported) =>
+            supported.cost === parameters.cost &&
+            supported.blockSize === parameters.blockSize &&
+            supported.parallelization === parameters.parallelization,
+        );
+      if (!isCurrent && !isLegacy) return false;
 
-      const suppliedKey = await this.deriveKey(password, salt);
+      const suppliedKey = await this.deriveKey(
+        password,
+        salt,
+        storedKey.length,
+        parameters,
+      );
       return timingSafeEqual(storedKey, suppliedKey);
     } catch {
       return false;
     }
   }
 
-  private deriveKey(password: string, salt: string): Promise<Buffer> {
+  private deriveKey(
+    password: string,
+    salt: string,
+    keyLength: number,
+    parameters: {
+      cost: number;
+      blockSize: number;
+      parallelization: number;
+    },
+  ): Promise<Buffer> {
     return new Promise((resolve, reject) => {
       scrypt(
         password,
         salt,
-        KEY_LENGTH,
+        keyLength,
         {
-          N: COST,
-          r: BLOCK_SIZE,
-          p: PARALLELIZATION,
-          maxmem: 32 * 1024 * 1024,
+          N: parameters.cost,
+          r: parameters.blockSize,
+          p: parameters.parallelization,
+          maxmem: this.calculateMaxMemory(
+            parameters.cost,
+            parameters.blockSize,
+            parameters.parallelization,
+            keyLength,
+          ),
         },
         (error, derivedKey) => {
           if (error) {
@@ -59,5 +91,19 @@ export class ScryptPasswordVerifier implements PasswordVerifier {
         },
       );
     });
+  }
+
+  private calculateMaxMemory(
+    cost: number,
+    blockSize: number,
+    parallelization: number,
+    keyLength: number,
+  ): number {
+    return (
+      128 * cost * blockSize +
+      128 * blockSize * parallelization +
+      keyLength +
+      1024 * 1024
+    );
   }
 }

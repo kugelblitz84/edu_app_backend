@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { passwordSchema } from '../../../password-policy';
 
 const EMAIL_PATTERN_MESSAGE = 'A valid email address is required.';
 const USERNAME_PATTERN_MESSAGE =
@@ -23,18 +24,7 @@ export const registerUserRequestSchema = z
         .max(30, USERNAME_PATTERN_MESSAGE)
         .regex(/^[a-zA-Z0-9_]+$/, USERNAME_PATTERN_MESSAGE),
     ),
-    password: z
-      .string({ error: 'Password must be 12-128 characters long.' })
-      .min(12, 'Password must be 12-128 characters long.')
-      .max(128, 'Password must be 12-128 characters long.')
-      .refine(
-        (password) => /[a-z]/.test(password) && /[A-Z]/.test(password),
-        'Password must include lowercase and uppercase letters.',
-      )
-      .refine(
-        (password) => /[0-9]/.test(password),
-        'Password must include at least one number.',
-      ),
+    password: passwordSchema,
   })
   .strict();
 

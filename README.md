@@ -70,6 +70,28 @@ npm run test:e2e
 npm run build
 ```
 
+## Password reset
+
+The API exposes:
+
+- `POST /api/v1/auth/password-reset/request` with `{ "email": "..." }`.
+  It always returns the same accepted response, whether or not an account exists.
+- `POST /api/v1/auth/password-reset/confirm` with
+  `{ "token": "...", "newPassword": "..." }`.
+- `POST /api/v1/auth/password-reset/change` with a bearer access token and
+  `{ "currentPassword": "...", "newPassword": "..." }`. If the request IP
+  or configured region differs from the last successful login, an email reset
+  link is issued instead.
+
+Configure the HTTPS frontend reset URL and SMTP settings shown in
+`.env.example`. The region header must be injected by a trusted edge proxy
+(Cloudflare's `CF-IPCountry` by default), and the application origin must not
+be directly reachable by clients. Apply database migrations before deployment:
+
+```bash
+npx prisma migrate deploy
+```
+
 ## Add a feature
 
 Use this minimum template:

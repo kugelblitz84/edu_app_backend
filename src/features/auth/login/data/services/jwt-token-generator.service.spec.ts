@@ -21,6 +21,20 @@ describe(JwtTokenGenerator.name, () => {
         accessTokenTtlSeconds: 900,
         refreshTokenTtlSeconds: 2_592_000,
         issuer: 'edu-app-api',
+        passwordResetUrl: 'https://example.com/reset-password',
+        passwordResetTtlSeconds: 3600,
+        ipRegionHeader: 'cf-ipcountry',
+      },
+      mail: {
+        port: 587,
+        secure: false,
+        from: 'no-reply@example.com',
+      },
+      passwordHashing: {
+        keyLength: 64,
+        cost: 131_072,
+        blockSize: 8,
+        parallelization: 1,
       },
     };
     const tokens = new JwtTokenGenerator(config).generate({

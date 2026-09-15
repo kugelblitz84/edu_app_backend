@@ -2,11 +2,15 @@ import {
   Body,
   Controller,
   ForbiddenException,
+  Inject,
   PipeTransform,
   Post,
+  Req,
   UnauthorizedException,
   UnprocessableEntityException,
 } from '@nestjs/common';
+import type { Request } from 'express';
+import { APP_CONFIG, type AppConfig } from '../../../../core/config/app-config';
 import {
   InvalidCredentialsError,
   LoginNotAllowedError,
@@ -41,21 +45,31 @@ class LoginRequestValidationPipe implements PipeTransform<
 
 @Controller({ path: 'auth', version: '1' })
 export class LoginController {
-  constructor(private readonly loginUser: LoginUseCase) {}
+  constructor(
+    private readonly loginUser: LoginUseCase,
+    @Inject(APP_CONFIG) private readonly config: AppConfig,
+  ) {}
 
   @Post('login')
   async login(
     @Body(new LoginRequestValidationPipe()) request: LoginRequestDto,
+    @Req() httpRequest: Request,
   ): Promise<LoginResponseDto> {
     try {
-      return toLoginResponseDto(await this.loginUser.execute(request));
+      const region = httpRequest.get(this.config.auth.ipRegionHeader)?.trim();
+      return toLoginResponseDto(
+        await this.loginUser.execute(request, {
+          ipAddress: httpRequest.ip,
+          ipRegion: region ? region.toUpperCase() : undefined,
+        }),
+      );
     } catch (error) {
       if (error instanceof InvalidCredentialsError) {
-        throw new UnauthorizedException(error.message);
+        throw new UnauthorizedException('Invalid username or password.');
       }
 
       if (error instanceof LoginNotAllowedError) {
-        throw new ForbiddenException(error.message);
+        throw new ForbiddenException('This account is not active.');
       }
 
       throw error;

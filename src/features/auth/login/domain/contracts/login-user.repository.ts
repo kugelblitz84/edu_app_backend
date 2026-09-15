@@ -19,5 +19,7 @@ export abstract class LoginUserRepository {
   abstract recordSuccessfulLogin(
     userId: string,
     loggedInAt: Date,
+    ipAddress?: string,
+    ipRegion?: string,
   ): Promise<void>;
 }

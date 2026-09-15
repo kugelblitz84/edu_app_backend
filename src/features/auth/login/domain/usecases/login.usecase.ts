@@ -12,6 +12,11 @@ export interface LoginInput {
   password?: unknown;
 }
 
+export interface LoginContext {
+  ipAddress?: string;
+  ipRegion?: string;
+}
+
 export class LoginUseCase {
   constructor(
     private readonly repository: LoginUserRepository,
@@ -19,7 +24,10 @@ export class LoginUseCase {
     private readonly tokenGenerator: TokenGenerator,
   ) {}
 
-  async execute(input: LoginInput): Promise<LoggedInUser> {
+  async execute(
+    input: LoginInput,
+    context: LoginContext = {},
+  ): Promise<LoggedInUser> {
     const username =
       typeof input.username === 'string' ? input.username.trim() : '';
     const password = typeof input.password === 'string' ? input.password : '';
@@ -50,7 +58,12 @@ export class LoginUseCase {
       emailVerified: user.emailVerifiedAt !== null,
     });
 
-    await this.repository.recordSuccessfulLogin(user.id, new Date());
+    await this.repository.recordSuccessfulLogin(
+      user.id,
+      new Date(),
+      context.ipAddress,
+      context.ipRegion,
+    );
 
     return {
       user: {

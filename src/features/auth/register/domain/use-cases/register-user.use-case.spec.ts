@@ -42,13 +42,13 @@ describe(RegisterUserUseCase.name, () => {
     const user = await useCase.execute({
       email: '  USER@Example.COM ',
       username: 'learner_01',
-      password: 'StrongPass123',
+      password: 'StrongPassword123',
     });
 
     expect(repository.createdUser).toEqual({
       email: 'user@example.com',
       username: 'learner_01',
-      passwordHash: 'hashed:StrongPass123',
+      passwordHash: 'hashed:StrongPassword123',
       fullName: 'learner_01',
     });
     expect(user.platformRole).toBe('GUEST');
