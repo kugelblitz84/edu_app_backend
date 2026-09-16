@@ -3,7 +3,7 @@ import { Test, TestingModule } from '@nestjs/testing';
 import request from 'supertest';
 import { App } from 'supertest/types';
 import { AppModule } from '../../src/app/app.module';
-import type { HealthResponseDto } from '../../src/features/health/presentation/dto/health-response.dto';
+import type { HealthResponse } from '../../src/features/health/health.service';
 
 describe('Application (e2e)', () => {
   let app: INestApplication<App>;
@@ -27,7 +27,7 @@ describe('Application (e2e)', () => {
       .get('/api/v1/health')
       .expect(200);
 
-    const body = response.body as HealthResponseDto;
+    const body = response.body as HealthResponse;
 
     expect(body.status).toBe('ok');
     expect(typeof body.environment).toBe('string');

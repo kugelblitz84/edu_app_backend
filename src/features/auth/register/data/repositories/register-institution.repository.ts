@@ -12,7 +12,7 @@ interface InstitutionRecord {
   id: string;
   name: string;
   slug: string;
-  institutionCode: string;
+  institutionCode: string | null;
   logoUrl: string | null;
   description: string | null;
   status: InstitutionStatus;

@@ -4,8 +4,16 @@ enum InstitutionStatus {
   PENDING_APPROVAL
   DELETED
   ARCHIVED
+  REJECTED
 
   @@map("institution_status")
+}
+
+enum InstitutionReviewVerdict {
+  APPROVED
+  REJECTED
+
+  @@map("institution_review_verdict")
 }
 
 model Institution {
@@ -13,7 +21,7 @@ model Institution {
   name            String            @unique @db.VarChar(160)
   slug            String            @unique @db.VarChar(160)
   status          InstitutionStatus @default(PENDING_APPROVAL) @map("institution_status")
-  institutionCode String            @unique @map("institution_code") @db.VarChar(20)
+  institutionCode String?           @unique @map("institution_code") @db.VarChar(20)
   logoUrl         String?           @map("logo_url")
   description     String?           @db.VarChar(500)
   createdAt       DateTime          @default(now()) @map("created_at") @db.Timestamptz
@@ -21,9 +29,16 @@ model Institution {
   createdByUserId String            @map("created_by_user_id") @db.Uuid
   createdByUser   User              @relation(fields: [createdByUserId], references: [id], onDelete: Restrict, onUpdate: Cascade)
   archivedAt      DateTime?         @map("archived_at") @db.Timestamptz
+  reviewVerdict   InstitutionReviewVerdict? @map("review_verdict")
+  respondedByUserId String?          @map("responded_by_user_id") @db.Uuid
+  respondedByUser User?              @relation("InstitutionReviewer", fields: [respondedByUserId], references: [id], onDelete: Restrict)
+  respondedAt     DateTime?          @map("responded_at") @db.Timestamptz
+  rejectReason    String?           @map("reject_reason") @db.VarChar(500)
+  reviewNotes     String?           @map("review_notes") @db.VarChar(1000)
 
   @@index([status])
   @@index([createdAt])
   @@index([createdByUserId])
+  @@index([respondedByUserId, respondedAt])
   @@map("institutions")
 }

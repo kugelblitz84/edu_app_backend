@@ -3,7 +3,6 @@ import type { RegisteredInstitution } from '../entities/registered-institution.e
 export interface CreateInstitutionRecord {
   name: string;
   slug: string;
-  institutionCode: string;
   logoUrl?: string;
   description?: string;
   status: 'PENDING_APPROVAL';

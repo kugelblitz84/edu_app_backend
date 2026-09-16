@@ -1,8 +1,8 @@
 import { createHash, randomBytes } from 'node:crypto';
 import {
   TokenService,
-  type VerifiedAccessToken,
 } from '../../../../../core/token/token.service';
+import type { VerifiedAccessToken } from '../../../../../core/token/token.entities';
 import { PasswordVerifier } from '../../../login/domain/contracts/password-verifier.service';
 import { PasswordHasher } from '../../../register/domain/contracts/password-hasher.service';
 import { PassResetMailerService } from '../contracts/pass-reset-mailer.service';

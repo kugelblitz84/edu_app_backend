@@ -16,6 +16,7 @@ class FakeRegisterInstitutionRepository implements RegisterInstitutionRepository
     return Promise.resolve({
       id: '3bb216fa-38a6-4a3c-bb7d-c2ee47e26140',
       ...institution,
+      institutionCode: null,
       logoUrl: institution.logoUrl ?? null,
       description: institution.description ?? null,
       createdAt: new Date('2026-09-15T00:00:00.000Z'),
@@ -33,7 +34,6 @@ describe(RegisterInstitutionUseCase.name, () => {
     const institution = await useCase.execute(
       {
         name: '  Dhaka Learning Academy  ',
-        institution_code: '  dla-01  ',
         description: '  A learning institution.  ',
       },
       '13c66d9e-42e8-4188-9c10-e2a8d8405587',
@@ -42,7 +42,6 @@ describe(RegisterInstitutionUseCase.name, () => {
     expect(repository.createdInstitution).toEqual({
       name: 'Dhaka Learning Academy',
       slug: 'dhaka-learning-academy',
-      institutionCode: 'DLA-01',
       logoUrl: undefined,
       description: 'A learning institution.',
       status: 'PENDING_APPROVAL',

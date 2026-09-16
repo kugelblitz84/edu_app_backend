@@ -1,43 +1,16 @@
 import { Inject, Injectable } from '@nestjs/common';
 import { createHmac, randomUUID, timingSafeEqual } from 'node:crypto';
-import type {
-  PlatformRole,
-  UserStatus,
-} from '../../features/auth/register/domain/entities/registered-user.entity';
 import { APP_CONFIG, type AppConfig } from '../config/app-config';
-
-export interface AccessTokenSubject {
-  userId: string;
-  username: string;
-  email: string;
-  platformRole: PlatformRole;
-  status: UserStatus;
-  emailVerified: boolean;
-}
-
-export interface GeneratedTokenPair {
-  accessToken: string;
-  refreshToken: string;
-  accessTokenExpiresIn: number;
-}
-
-export interface VerifiedAccessToken {
-  userId: string;
-  issuedAt: Date;
-}
-
-interface JwtPayload {
-  [claim: string]: boolean | number | string;
-}
-
-interface AccessTokenPayload {
-  sub?: unknown;
-  iat?: unknown;
-  exp?: unknown;
-  iss?: unknown;
-  aud?: unknown;
-  tokenType?: unknown;
-}
+import type { PlatformRole } from '../../features/auth/register/domain/entities/registered-user.entity';
+import type {
+  AccessTokenPayload,
+  AccessTokenSubject,
+  GeneratedTokenPair,
+  JwtPayload,
+  RefreshTokenPayload,
+  VerifiedAccessToken,
+  VerifiedTokenPayload,
+} from './token.entities';
 
 @Injectable()
 export class TokenService {
@@ -68,6 +41,11 @@ export class TokenService {
     const refreshToken = this.sign(
       {
         sub: subject.userId,
+        username: subject.username,
+        email: subject.email,
+        role: subject.platformRole,
+        status: subject.status,
+        emailVerified: subject.emailVerified,
         tokenType: 'refresh',
         iss: auth.issuer,
         aud: 'edu-app-refresh',
@@ -86,6 +64,57 @@ export class TokenService {
   }
 
   verify(token: string): VerifiedAccessToken {
+    const payload = this.verifyToken(
+      token,
+      this.config.auth.accessTokenSecret,
+      'edu-app-api',
+      'access',
+    );
+
+    return {
+      userId: payload.sub,
+      platformRole: this.readPlatformRole(payload.role),
+      issuedAt: new Date(payload.iat * 1000),
+    };
+  }
+
+  verifyRefreshToken(token: string): GeneratedTokenPair {
+    const payload = this.verifyToken(
+      token,
+      this.config.auth.refreshTokenSecret,
+      'edu-app-refresh',
+      'refresh',
+    ) as RefreshTokenPayload;
+
+    if (
+      typeof payload.username !== 'string' ||
+      typeof payload.email !== 'string' ||
+      (payload.role !== 'GUEST' && payload.role !== 'GLOBAL_ADMIN') ||
+      (payload.status !== 'ACTIVE' &&
+        payload.status !== 'SUSPENDED' &&
+        payload.status !== 'BANNED' &&
+        payload.status !== 'DELETED') ||
+      typeof payload.emailVerified !== 'boolean'
+    ) {
+      throw new Error('Invalid token');
+    }
+
+    return this.generate({
+      userId: payload.sub,
+      username: payload.username,
+      email: payload.email,
+      platformRole: payload.role,
+      status: payload.status,
+      emailVerified: payload.emailVerified,
+    });
+  }
+
+  private verifyToken(
+    token: string,
+    secret: string,
+    audience: string,
+    tokenType: 'access' | 'refresh',
+  ): VerifiedTokenPayload {
     if (token.length > 4096) throw new Error('Invalid token');
     const parts = token.split('.');
     if (parts.length !== 3) throw new Error('Invalid token');
@@ -99,10 +128,7 @@ export class TokenService {
       throw new Error('Invalid token');
     }
 
-    const expectedSignature = createHmac(
-      'sha256',
-      this.config.auth.accessTokenSecret,
-    )
+    const expectedSignature = createHmac('sha256', secret)
       .update(`${encodedHeader}.${encodedPayload}`)
       .digest();
     const supplied = Buffer.from(suppliedSignature, 'base64url');
@@ -124,16 +150,13 @@ export class TokenService {
       payload.iat > now + 60 ||
       payload.exp <= now ||
       payload.iss !== this.config.auth.issuer ||
-      payload.aud !== 'edu-app-api' ||
-      payload.tokenType !== 'access'
+      payload.aud !== audience ||
+      payload.tokenType !== tokenType
     ) {
       throw new Error('Invalid token');
     }
 
-    return {
-      userId: payload.sub,
-      issuedAt: new Date(payload.iat * 1000),
-    };
+    return payload as VerifiedTokenPayload;
   }
 
   private sign(payload: JwtPayload, secret: string): string {
@@ -154,5 +177,13 @@ export class TokenService {
     return JSON.parse(
       Buffer.from(value, 'base64url').toString('utf8'),
     ) as unknown;
+  }
+
+  private readPlatformRole(value: unknown): PlatformRole {
+    if (value === 'GUEST' || value === 'GLOBAL_ADMIN') {
+      return value;
+    }
+
+    throw new Error('Invalid token');
   }
 }

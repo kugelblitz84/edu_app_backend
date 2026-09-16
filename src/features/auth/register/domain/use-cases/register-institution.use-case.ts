@@ -3,7 +3,6 @@ import type { RegisteredInstitution } from '../entities/registered-institution.e
 
 export interface RegisterInstitutionInput {
   name: string;
-  institution_code: string;
   logo_url?: string;
   description?: string;
 }
@@ -20,7 +19,6 @@ export class RegisterInstitutionUseCase {
     return this.repository.createInstitution({
       name,
       slug: this.toSlug(name),
-      institutionCode: input.institution_code.trim().toUpperCase(),
       logoUrl: input.logo_url,
       description: input.description?.trim() || undefined,
       status: 'PENDING_APPROVAL',

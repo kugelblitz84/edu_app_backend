@@ -1,8 +1,10 @@
 import {
-  type AccessTokenSubject,
-  type GeneratedTokenPair,
   TokenService,
 } from '../../../../../core/token/token.service';
+import type {
+  AccessTokenSubject,
+  GeneratedTokenPair,
+} from '../../../../../core/token/token.entities';
 import {
   LoginUserRepository,
   type LoginUserRecord,

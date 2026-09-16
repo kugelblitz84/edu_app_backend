@@ -34,6 +34,7 @@ model User {
 
   passwordResets      PasswordReset[]
   createdInstitutions Institution[]
+  reviewedInstitutions Institution[] @relation("InstitutionReviewer")
 
   @@index([platformRole])
   @@index([status])
