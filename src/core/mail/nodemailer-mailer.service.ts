@@ -33,3 +33,9 @@ export class NodemailerMailerService implements MailerService {
     });
   }
 }
+
+// @Injectable()
+// export class MailServerMailerService implements MailerService{
+//   constructor(@Inject(APP_CONFIG) private readonly config: AppConfig) {}
+//   async send(message: MailMessage): Promise<void> {}
+// }

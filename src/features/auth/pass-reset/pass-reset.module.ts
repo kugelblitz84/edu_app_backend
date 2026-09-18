@@ -29,6 +29,7 @@ import { PassResetController } from './presentation/controllers/pass-reset.contr
     {
       provide: PassResetUseCase,
       useFactory: (
+        // configenv: true,
         repository: PassResetRepository,
         hasher: PasswordHasher,
         verifier: PasswordVerifier,
@@ -37,6 +38,7 @@ import { PassResetController } from './presentation/controllers/pass-reset.contr
         config: AppConfig,
       ) =>
         new PassResetUseCase(
+         
           repository,
           hasher,
           verifier,

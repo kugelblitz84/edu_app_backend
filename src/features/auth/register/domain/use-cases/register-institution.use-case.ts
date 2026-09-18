@@ -15,13 +15,17 @@ export class RegisterInstitutionUseCase {
     createdByUserId: string,
   ): Promise<RegisteredInstitution> {
     const name = input.name.trim();
-
+    const slug = this.toSlug(name);
+    const logoUrl = input.logo_url?.trim() || undefined;
+    const description = input.description?.trim() || undefined;
+    const status = 'PENDING_APPROVAL';
+    
     return this.repository.createInstitution({
       name,
-      slug: this.toSlug(name),
-      logoUrl: input.logo_url,
-      description: input.description?.trim() || undefined,
-      status: 'PENDING_APPROVAL',
+      slug,
+      logoUrl,
+      description,
+      status,
       createdByUserId,
     });
   }
