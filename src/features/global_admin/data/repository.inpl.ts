@@ -55,21 +55,48 @@ export class PrismaGlobalAdminRepository implements GlobalAdminRepository {
     decision: ReviewDecision,
   ): Promise<InstitutionReview | null> {
     try {
-      const result = await this.prisma.institution.updateMany({
-        where: { id, status: 'PENDING_APPROVAL' },
-        data: {
-          status: decision.verdict === 'APPROVED' ? 'ACTIVE' : 'REJECTED',
-          reviewVerdict: decision.verdict,
-          respondedByUserId: decision.respondedByUserId,
-          respondedAt: decision.respondedAt,
-          institutionCode: decision.institutionCode ?? null,
-          rejectReason: decision.rejectReason ?? null,
-          reviewNotes: decision.notes ?? null,
-        },
-      });
+      return await this.prisma.$transaction(async (tx) => {
+        const result = await tx.institution.updateMany({
+          where: { id, status: 'PENDING_APPROVAL' },
+          data: {
+            status: decision.verdict === 'APPROVED' ? 'ACTIVE' : 'REJECTED',
+            reviewVerdict: decision.verdict,
+            respondedByUserId: decision.respondedByUserId,
+            respondedAt: decision.respondedAt,
+            institutionCode: decision.institutionCode ?? null,
+            rejectReason: decision.rejectReason ?? null,
+            reviewNotes: decision.notes ?? null,
+          },
+        });
 
-      if (result.count === 0) return null;
-      return this.findById(id);
+        if (result.count === 0) return null;
+
+        if (decision.verdict === 'APPROVED') {
+          const institution = await tx.institution.findUniqueOrThrow({
+            where: { id },
+            select: { createdByUserId: true },
+          });
+
+          await tx.institutionAdmin.upsert({
+            where: {
+              institutionId_userId: {
+                institutionId: id,
+                userId: institution.createdByUserId,
+              },
+            },
+            create: {
+              institutionId: id,
+              userId: institution.createdByUserId,
+            },
+            update: {},
+          });
+        }
+
+        return tx.institution.findUnique({
+          where: { id },
+          select: reviewSelect,
+        });
+      });
     } catch (error) {
       if (
         error instanceof Prisma.PrismaClientKnownRequestError &&
