@@ -28,6 +28,7 @@ model Institution {
   updatedAt       DateTime          @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
   createdByUserId String            @map("created_by_user_id") @db.Uuid
   createdByUser   User              @relation(fields: [createdByUserId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  admins          InstitutionAdmin[]
   archivedAt      DateTime?         @map("archived_at") @db.Timestamptz
   reviewVerdict   InstitutionReviewVerdict? @map("review_verdict")
   respondedByUserId String?          @map("responded_by_user_id") @db.Uuid

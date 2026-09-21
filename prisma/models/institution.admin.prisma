@@ -1,0 +1,10 @@
+model InstitutionAdmin {
+	institutionId String      @map("institution_id") @db.Uuid
+	userId        String      @map("user_id") @db.Uuid
+	institution   Institution @relation(fields: [institutionId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+	user          User        @relation(fields: [userId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+
+	@@id([institutionId, userId])
+	@@index([userId])
+	@@map("institution_admins")
+}

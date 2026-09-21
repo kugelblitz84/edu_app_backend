@@ -95,18 +95,6 @@ export class GlobalAdminController {
     return toDecisionResponse(result);
   }
 
-  @Patch(':id/approve')
-  async approveInstitution(
-    @Param('id', new ParseUUIDPipe()) id: string,
-    @Req() request: GlobalAdminRequest,
-  ): Promise<InstitutionDecisionResponseDto> {
-    return toDecisionResponse(
-      await this.useCases.respond(id, request.globalAdminUserId, {
-        verdict: 'APPROVED',
-      }),
-    );
-  }
-
   private parseQuery(
     query: Record<string, unknown>,
     schema: z.ZodType<ReviewPageOptions> = institutionReviewQuerySchema,

@@ -95,7 +95,7 @@ export class RegisterController {
     private readonly tokenService: TokenService,
   ) {}
 
-  @Post(['register', 'register/user'])
+  @Post('register/user')
   async register(
     @Body(new RegisterUserRequestValidationPipe())
     request: RegisterUserRequestDto,

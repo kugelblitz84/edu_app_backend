@@ -129,6 +129,18 @@ function parseCorsOrigins(value: string | undefined): string[] {
     .filter(Boolean);
 }
 
+function loadDatabaseUrl(value: string | undefined): string {
+  const databaseUrl = value?.trim();
+
+  if (!databaseUrl) {
+    throw new Error(
+      'DATABASE_URL is required. Copy .env.example to .env and set the PostgreSQL connection string.',
+    );
+  }
+
+  return databaseUrl;
+}
+
 export function loadAppConfig(): AppConfig {
   const nodeEnv = parseNodeEnvironment(process.env.NODE_ENV);
   const smtpHost = process.env.SMTP_HOST?.trim() || undefined;
@@ -169,9 +181,7 @@ export function loadAppConfig(): AppConfig {
     nodeEnv,
     port: parsePort(process.env.PORT),
     corsOrigins: parseCorsOrigins(process.env.CORS_ORIGINS),
-    databaseUrl:
-      process.env.DATABASE_URL ??
-      'postgres://postgres:postgres@localhost:5432/edu_app_sadi',
+    databaseUrl: loadDatabaseUrl(process.env.DATABASE_URL),
     auth: {
       accessTokenSecret,
       refreshTokenSecret,

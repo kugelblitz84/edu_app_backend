@@ -6,7 +6,7 @@ import type { HealthResponse } from './health.service';
 export class HealthController {
   constructor(private readonly healthService: HealthService) {}
 
-  @Get()
+  @Get('status')
   getStatus(): HealthResponse {
     return this.healthService.getStatus();
   }
