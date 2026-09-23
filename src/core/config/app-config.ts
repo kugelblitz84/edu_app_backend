@@ -9,6 +9,7 @@ export interface AppConfig {
   port: number;
   corsOrigins: string[];
   databaseUrl: string;
+  mongodbUrl: string;
   auth: {
     accessTokenSecret: string;
     refreshTokenSecret: string;
@@ -141,6 +142,27 @@ function loadDatabaseUrl(value: string | undefined): string {
   return databaseUrl;
 }
 
+function loadMongodbUrl(value: string | undefined): string {
+  const mongodbUrl = value?.trim();
+
+  if (!mongodbUrl) {
+    throw new Error(
+      'MONGODB_URL is required. Copy .env.example to .env and set the MongoDB connection string.',
+    );
+  }
+
+  if (
+    !mongodbUrl.startsWith('mongodb://') &&
+    !mongodbUrl.startsWith('mongodb+srv://')
+  ) {
+    throw new Error(
+      'MONGODB_URL must use the mongodb or mongodb+srv protocol.',
+    );
+  }
+
+  return mongodbUrl;
+}
+
 export function loadAppConfig(): AppConfig {
   const nodeEnv = parseNodeEnvironment(process.env.NODE_ENV);
   const smtpHost = process.env.SMTP_HOST?.trim() || undefined;
@@ -182,6 +204,7 @@ export function loadAppConfig(): AppConfig {
     port: parsePort(process.env.PORT),
     corsOrigins: parseCorsOrigins(process.env.CORS_ORIGINS),
     databaseUrl: loadDatabaseUrl(process.env.DATABASE_URL),
+    mongodbUrl: loadMongodbUrl(process.env.MONGODB_URL),
     auth: {
       accessTokenSecret,
       refreshTokenSecret,
