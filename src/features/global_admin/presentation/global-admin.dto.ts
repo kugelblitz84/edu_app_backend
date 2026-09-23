@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import type { InstitutionReview } from '../domain/contracts/repositories';
+import type { InstitutionReview } from '../domain/contracts/types';
 
 export const institutionReviewQuerySchema = z
   .object({

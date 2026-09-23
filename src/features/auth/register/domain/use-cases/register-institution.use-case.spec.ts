@@ -1,7 +1,5 @@
-import type {
-  CreateInstitutionRecord,
-  RegisterInstitutionRepository,
-} from '../contracts/register-institution.repository';
+import type { RegisterInstitutionRepository } from '../contracts/register-institution.repository';
+import type { CreateInstitutionRecord } from '../contracts/types';
 import type { RegisteredInstitution } from '../entities/registered-institution.entity';
 import { RegisterInstitutionUseCase } from './register-institution.use-case';
 

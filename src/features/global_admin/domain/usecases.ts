@@ -4,14 +4,14 @@ import {
   InternalServerErrorException,
   NotFoundException,
 } from '@nestjs/common';
-import {
-  GlobalAdminRepository,
-  type ReviewDecision,
-  type ReviewPage,
-  type ReviewPageOptions,
-  type ReviewVerdict,
-  type InstitutionReview,
-} from './contracts/repositories';
+import { GlobalAdminRepository } from './contracts/repositories';
+import type {
+  InstitutionReview,
+  ReviewDecision,
+  ReviewPage,
+  ReviewPageOptions,
+  ReviewVerdict,
+} from './contracts/types';
 import {
   InstitutionCodeConflictError,
   InstitutionCodeGenerator,

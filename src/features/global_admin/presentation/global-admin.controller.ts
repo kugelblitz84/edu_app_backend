@@ -10,7 +10,7 @@ import {
   Req,
 } from '@nestjs/common';
 import { z } from 'zod';
-import type { ReviewPageOptions } from '../domain/contracts/repositories';
+import type { ReviewPageOptions } from '../domain/contracts/types';
 import type { GlobalAdminRequest } from './global-admin-auth.middleware';
 import { GlobalAdminUseCases } from '../domain/usecases';
 import {

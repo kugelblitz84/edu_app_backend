@@ -1,10 +1,10 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../../../../../core/database/prisma.service';
-import {
-  PassResetRepository,
-  type PasswordResetRecord,
-  type PasswordResetUser,
-} from '../../domain/contracts/pass-reset.repository';
+import { PassResetRepository } from '../../domain/contracts/pass-reset.repository';
+import type {
+  PasswordResetRecord,
+  PasswordResetUser,
+} from '../../domain/contracts/types';
 
 const userSelection = {
   id: true,

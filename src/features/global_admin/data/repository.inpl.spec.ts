@@ -1,7 +1,7 @@
 import type {
   InstitutionReview,
   ReviewDecision,
-} from '../domain/contracts/repositories';
+} from '../domain/contracts/types';
 import { PrismaGlobalAdminRepository } from './repository.inpl';
 
 const institutionId = '3bb216fa-38a6-4a3c-bb7d-c2ee47e26140';

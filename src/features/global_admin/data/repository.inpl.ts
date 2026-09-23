@@ -1,14 +1,14 @@
 import { Injectable } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../../../core/database/prisma.service';
-import {
-  GlobalAdminRepository,
-  type InstitutionReview,
-  type ReviewDecision,
-  type ReviewPage,
-  type ReviewPageOptions,
-} from '../domain/contracts/repositories';
+import { GlobalAdminRepository } from '../domain/contracts/repositories';
 import { InstitutionCodeConflictError } from '../domain/contracts/services';
+import type {
+  InstitutionReview,
+  ReviewDecision,
+  ReviewPage,
+  ReviewPageOptions,
+} from '../domain/contracts/types';
 
 const reviewSelect = {
   id: true,

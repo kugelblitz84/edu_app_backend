@@ -32,10 +32,12 @@ model User {
   updatedAt         DateTime     @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
   deletedAt         DateTime?    @map("deleted_at") @db.Timestamptz
 
-  passwordResets      PasswordReset[]
-  createdInstitutions Institution[]
-  reviewedInstitutions Institution[] @relation("InstitutionReviewer")
+  passwordResets        PasswordReset[]
+  createdInstitutions   Institution[]
+  reviewedInstitutions  Institution[]      @relation("InstitutionReviewer")
   institutionAdminships InstitutionAdmin[]
+  personalExams         PersonalExam[]
+  institutionExams      InstitutionExam[]
 
   @@index([platformRole])
   @@index([status])

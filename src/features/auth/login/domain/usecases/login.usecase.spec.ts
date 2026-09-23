@@ -1,14 +1,10 @@
-import {
-  TokenService,
-} from '../../../../../core/token/token.service';
+import { TokenService } from '../../../../../core/token/token.service';
 import type {
   AccessTokenSubject,
   GeneratedTokenPair,
 } from '../../../../../core/token/token.entities';
-import {
-  LoginUserRepository,
-  type LoginUserRecord,
-} from '../contracts/login-user.repository';
+import { LoginUserRepository } from '../contracts/login-user.repository';
+import type { LoginUserRecord } from '../contracts/types';
 import { PasswordVerifier } from '../contracts/password-verifier.service';
 import {
   InvalidCredentialsError,

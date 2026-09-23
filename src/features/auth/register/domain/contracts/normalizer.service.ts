@@ -1,13 +1,7 @@
-export interface RegisterUserInput {
-  email?: unknown;
-  username?: unknown;
-  password?: unknown;
-}
+import type { NormalizedRegisterUser, RegisterUserInput } from './types';
 
 export abstract class normalizer {
-  abstract normalizeAndValidate(input: RegisterUserInput): {
-    email: string;
-    username: string;
-    password: string;
-  };
+  abstract normalizeAndValidate(
+    input: RegisterUserInput,
+  ): NormalizedRegisterUser;
 }

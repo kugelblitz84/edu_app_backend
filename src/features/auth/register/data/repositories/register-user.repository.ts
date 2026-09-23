@@ -1,10 +1,8 @@
 import { Injectable } from '@nestjs/common';
 import { Prisma, type PlatformRole, type UserStatus } from '@prisma/client';
 import { PrismaService } from '../../../../../core/database/prisma.service';
-import {
-  CreateUserRecord,
-  RegisterUserRepository,
-} from '../../domain/contracts/register-user.repository';
+import { RegisterUserRepository } from '../../domain/contracts/register-user.repository';
+import type { CreateUserRecord } from '../../domain/contracts/types';
 import type { RegisteredUser } from '../../domain/entities/registered-user.entity';
 import { RegistrationConflictError } from '../../domain/errors/registration.error';
 

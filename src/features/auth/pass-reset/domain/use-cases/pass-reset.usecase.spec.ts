@@ -1,16 +1,14 @@
 import { createHash } from 'node:crypto';
-import {
-  TokenService,
-} from '../../../../../core/token/token.service';
+import { TokenService } from '../../../../../core/token/token.service';
 import type { VerifiedAccessToken } from '../../../../../core/token/token.entities';
 import type { PasswordVerifier } from '../../../login/domain/contracts/password-verifier.service';
 import type { PasswordHasher } from '../../../register/domain/contracts/password-hasher.service';
 import type { PassResetMailerService } from '../contracts/pass-reset-mailer.service';
-import {
-  PassResetRepository,
-  type PasswordResetRecord,
-  type PasswordResetUser,
-} from '../contracts/pass-reset.repository';
+import { PassResetRepository } from '../contracts/pass-reset.repository';
+import type {
+  PasswordResetRecord,
+  PasswordResetUser,
+} from '../contracts/types';
 import {
   InvalidCurrentPasswordError,
   InvalidResetTokenError,

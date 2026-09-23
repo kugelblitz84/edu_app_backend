@@ -1,10 +1,8 @@
 import { Injectable } from '@nestjs/common';
 import { Prisma, type InstitutionStatus } from '@prisma/client';
 import { PrismaService } from '../../../../../core/database/prisma.service';
-import {
-  type CreateInstitutionRecord,
-  RegisterInstitutionRepository,
-} from '../../domain/contracts/register-institution.repository';
+import { RegisterInstitutionRepository } from '../../domain/contracts/register-institution.repository';
+import type { CreateInstitutionRecord } from '../../domain/contracts/types';
 import type { RegisteredInstitution } from '../../domain/entities/registered-institution.entity';
 import { InstitutionRegistrationConflictError } from '../../domain/errors/registration.error';
 

@@ -3,7 +3,7 @@ import { Test } from '@nestjs/testing';
 import type { Server } from 'node:http';
 import request from 'supertest';
 import { TokenService } from '../../core/token/token.service';
-import type { InstitutionReview } from './domain/contracts/repositories';
+import type { InstitutionReview } from './domain/contracts/types';
 import { InstitutionCodeConflictError } from './domain/contracts/services';
 import { GlobalAdminUseCases } from './domain/usecases';
 import { GlobalAdminAuthMiddleware } from './presentation/global-admin-auth.middleware';

@@ -1,9 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../../../../../core/database/prisma.service';
-import {
-  LoginUserRepository,
-  type LoginUserRecord,
-} from '../../domain/contracts/login-user.repository';
+import { LoginUserRepository } from '../../domain/contracts/login-user.repository';
+import type { LoginUserRecord } from '../../domain/contracts/types';
 
 @Injectable()
 export class PrismaLoginUserRepository implements LoginUserRepository {

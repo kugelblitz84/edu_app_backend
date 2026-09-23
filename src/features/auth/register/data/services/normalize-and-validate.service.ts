@@ -1,7 +1,8 @@
-import {
-  normalizer,
+import { normalizer } from '../../domain/contracts/normalizer.service';
+import type {
+  NormalizedRegisterUser,
   RegisterUserInput,
-} from '../../domain/contracts/normalizer.service';
+} from '../../domain/contracts/types';
 import { RegistrationValidationError } from '../../domain/errors/registration.error';
 import {
   PASSWORD_LENGTH_MESSAGE,
@@ -12,11 +13,7 @@ const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const USERNAME_PATTERN = /^[a-zA-Z0-9_]+$/;
 
 export class NormalizeAndValidateServiceImpl implements normalizer {
-  normalizeAndValidate(input: RegisterUserInput): {
-    email: string;
-    username: string;
-    password: string;
-  } {
+  normalizeAndValidate(input: RegisterUserInput): NormalizedRegisterUser {
     {
       const violations: string[] = [];
       const email =

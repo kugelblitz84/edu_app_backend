@@ -1,9 +1,7 @@
 import { NormalizeAndValidateServiceImpl } from '../../data/services/normalize-and-validate.service';
 import { PasswordHasher } from '../contracts/password-hasher.service';
-import {
-  CreateUserRecord,
-  RegisterUserRepository,
-} from '../contracts/register-user.repository';
+import { RegisterUserRepository } from '../contracts/register-user.repository';
+import type { CreateUserRecord } from '../contracts/types';
 import { RegistrationValidationError } from '../errors/registration.error';
 import { RegisterUserUseCase } from './register-user.use-case';
 

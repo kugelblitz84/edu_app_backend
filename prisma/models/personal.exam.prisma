@@ -1,0 +1,30 @@
+enum ExamStatus {
+  DRAFT
+  SCHEDULED
+  ACTIVE
+  COMPLETED
+  ARCHIVED
+  CANCELLED
+
+  @@map("exam_status")
+}
+
+model PersonalExam {
+  id              String     @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  name            String     @db.VarChar(200)
+  description     String?    @db.VarChar(1000)
+  examDate        DateTime?  @map("exam_date") @db.Timestamptz
+  durationMinutes Int?       @map("duration_minutes")
+  status          ExamStatus @default(DRAFT)
+  createdByUserId String     @map("created_by_user_id") @db.Uuid
+  createdByUser   User       @relation(fields: [createdByUserId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  createdAt       DateTime   @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt       DateTime   @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
+  deletedAt       DateTime?  @map("deleted_at") @db.Timestamptz
+
+  @@index([createdByUserId])
+  @@index([examDate])
+  @@index([status])
+  @@index([createdAt])
+  @@map("personal_exams")
+}
