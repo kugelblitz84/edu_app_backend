@@ -19,4 +19,4 @@ import { SessionService } from './services/session.service';
   ],
   exports: [AccessTokenService, SessionService, RolesGuard],
 })
-export class AuthModule {}
+export class GlobalAuthModule {}
