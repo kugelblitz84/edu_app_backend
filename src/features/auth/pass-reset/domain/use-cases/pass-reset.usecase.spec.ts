@@ -1,6 +1,4 @@
 import { createHash } from 'node:crypto';
-import { TokenService } from '../../../../../core/token/token.service';
-import type { VerifiedAccessToken } from '../../../../../core/token/token.entities';
 import type { PasswordVerifier } from '../../../login/domain/contracts/password-verifier.service';
 import type { PasswordHasher } from '../../../register/domain/contracts/password-hasher.service';
 import type { PassResetMailerService } from '../contracts/pass-reset-mailer.service';
@@ -105,16 +103,6 @@ class FakeMailer implements PassResetMailerService {
   }
 }
 
-class FakeTokenVerifier implements Pick<TokenService, 'verify'> {
-  subject: VerifiedAccessToken = {
-    userId: USER.id,
-    issuedAt: new Date(),
-  };
-  verify(): VerifiedAccessToken {
-    return this.subject;
-  }
-}
-
 const hasher: PasswordHasher = {
   hash: (password) => Promise.resolve(`hash:${password}`),
 };
@@ -125,16 +113,14 @@ const verifier: PasswordVerifier = {
 function setup() {
   const repository = new FakeRepository();
   const mailer = new FakeMailer();
-  const tokenVerifier = new FakeTokenVerifier();
   const useCase = new PassResetUseCase(
     repository,
     hasher,
     verifier,
-    tokenVerifier,
     mailer,
     3600,
   );
-  return { repository, mailer, tokenVerifier, useCase };
+  return { repository, mailer, useCase };
 }
 
 describe(PassResetUseCase.name, () => {
@@ -186,7 +172,8 @@ describe(PassResetUseCase.name, () => {
   it('changes the password only when token, IP, region, and current password match', async () => {
     const { repository, mailer, useCase } = setup();
     const changed = await useCase.changeAuthenticated({
-      accessToken: 'valid',
+      userId: USER.id,
+      accessTokenIssuedAt: new Date(),
       currentPassword: 'CurrentPassword123',
       newPassword: 'A completely new password',
       ipAddress: USER.lastLoginIp ?? undefined,
@@ -205,7 +192,8 @@ describe(PassResetUseCase.name, () => {
   it('uses email verification on a changed network without checking the supplied current password', async () => {
     const { mailer, useCase } = setup();
     const result = await useCase.changeAuthenticated({
-      accessToken: 'valid',
+      userId: USER.id,
+      accessTokenIssuedAt: new Date(),
       currentPassword: 'wrong',
       newPassword: 'A completely new password',
       ipAddress: USER.lastLoginIp ?? undefined,
@@ -220,7 +208,8 @@ describe(PassResetUseCase.name, () => {
     const { useCase } = setup();
     await expect(
       useCase.changeAuthenticated({
-        accessToken: 'valid',
+        userId: USER.id,
+        accessTokenIssuedAt: new Date(),
         currentPassword: 'wrong',
         newPassword: 'A completely new password',
         ipAddress: USER.lastLoginIp ?? undefined,

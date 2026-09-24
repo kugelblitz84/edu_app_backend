@@ -1,7 +1,6 @@
 import { Module } from '@nestjs/common';
 import { MailerService } from './mailer.service';
 import { NodemailerMailerService } from './nodemailer-mailer.service';
-import { AppConfig } from '../config/app-config';
 
 @Module({
   providers: [

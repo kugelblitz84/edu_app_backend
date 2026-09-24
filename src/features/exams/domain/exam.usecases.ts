@@ -89,10 +89,7 @@ export class ExamUseCases {
     return updated;
   }
 
-  private async requireEditableExam(
-    id: string,
-    userId: string,
-  ): Promise<void> {
+  private async requireEditableExam(id: string, userId: string): Promise<void> {
     const exam = await this.repository.findAccessibleById(id, userId);
     if (!exam) throw new NotFoundException('Exam not found.');
     if (exam.status !== 'DRAFT' && exam.status !== 'SCHEDULED') {

@@ -2,7 +2,6 @@ import {
   BadRequestException,
   Body,
   Controller,
-  Headers,
   HttpCode,
   HttpException,
   HttpStatus,
@@ -14,6 +13,9 @@ import {
 } from '@nestjs/common';
 import { createHash } from 'node:crypto';
 import type { Request } from 'express';
+import type { AuthenticatedUser } from '../../../../../core/auth/auth.types';
+import { CurrentUser } from '../../../../../core/auth/decorators/current-user.decorator';
+import { Public } from '../../../../../core/auth/decorators/public.decorator';
 import {
   APP_CONFIG,
   type AppConfig,
@@ -53,6 +55,7 @@ export class PassResetController {
   ) {}
 
   @Post('request')
+  @Public()
   @HttpCode(HttpStatus.ACCEPTED)
   async request(
     @Body(new ZodValidationPipe(requestPassResetSchema))
@@ -74,6 +77,7 @@ export class PassResetController {
   }
 
   @Post('confirm')
+  @Public()
   @HttpCode(HttpStatus.OK)
   async confirm(
     @Body(new ZodValidationPipe(confirmPassResetSchema))
@@ -97,16 +101,16 @@ export class PassResetController {
   async changeAuthenticated(
     @Body(new ZodValidationPipe(authenticatedPassResetSchema))
     input: AuthenticatedPassResetDto,
-    @Headers('authorization') authorization: string | undefined,
+    @CurrentUser() currentUser: AuthenticatedUser,
     @Req() request: Request,
   ): Promise<{ status: string; message: string }> {
     this.enforceRateLimit(`change:${request.ip}`, 5, 15 * 60_000);
-    const accessToken = this.readBearerToken(authorization);
     const rawRegion = request.get(this.config.auth.ipRegionHeader)?.trim();
 
     try {
       const result = await this.passReset.changeAuthenticated({
-        accessToken,
+        userId: currentUser.userId,
+        accessTokenIssuedAt: currentUser.issuedAt,
         currentPassword: input.currentPassword,
         newPassword: input.newPassword,
         ipAddress: request.ip,
@@ -131,14 +135,6 @@ export class PassResetController {
       }
       throw error;
     }
-  }
-
-  private readBearerToken(authorization?: string): string {
-    const match = authorization?.match(/^Bearer ([^\s]+)$/i);
-    if (!match || match[1].length > 4096) {
-      throw new UnauthorizedException('A valid access token is required.');
-    }
-    return match[1];
   }
 
   private enforceRateLimit(

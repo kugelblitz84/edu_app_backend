@@ -1,6 +1,5 @@
 import { Module } from '@nestjs/common';
 import { PrismaModule } from '../../../core/database/prisma.module';
-import { TokenModule } from '../../../core/token/token.module';
 import { PrismaRegisterUserRepository } from './data/repositories/register-user.repository';
 import { PrismaRegisterInstitutionRepository } from './data/repositories/register-institution.repository';
 import { ScryptPasswordHasher } from './data/services/scrypt-password-hasher.service';
@@ -14,7 +13,7 @@ import { RegisterController } from './presentation/controllers/register.controll
 import { NormalizeAndValidateServiceImpl } from './data/services/normalize-and-validate.service';
 
 @Module({
-  imports: [PrismaModule, TokenModule],
+  imports: [PrismaModule],
   controllers: [RegisterController],
   providers: [
     {

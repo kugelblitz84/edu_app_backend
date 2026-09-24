@@ -5,7 +5,13 @@ export interface RegisteredInstitution {
   institutionCode: string | null;
   logoUrl: string | null;
   description: string | null;
-  status: 'SUSPENDED' | 'ACTIVE' | 'PENDING_APPROVAL' | 'DELETED' | 'ARCHIVED' | 'REJECTED';
+  status:
+    | 'SUSPENDED'
+    | 'ACTIVE'
+    | 'PENDING_APPROVAL'
+    | 'DELETED'
+    | 'ARCHIVED'
+    | 'REJECTED';
   createdByUserId: string;
   createdAt: Date;
   updatedAt: Date;

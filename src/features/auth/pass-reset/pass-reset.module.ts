@@ -2,8 +2,6 @@ import { Module } from '@nestjs/common';
 import { APP_CONFIG, type AppConfig } from '../../../core/config/app-config';
 import { PrismaModule } from '../../../core/database/prisma.module';
 import { MailModule } from '../../../core/mail/mail.module';
-import { TokenModule } from '../../../core/token/token.module';
-import { TokenService } from '../../../core/token/token.service';
 import { ScryptPasswordVerifier } from '../login/data/services/scrypt-password-verifier.service';
 import { PasswordVerifier } from '../login/domain/contracts/password-verifier.service';
 import { ScryptPasswordHasher } from '../register/data/services/scrypt-password-hasher.service';
@@ -16,7 +14,7 @@ import { PassResetUseCase } from './domain/use-cases/pass-reset.usecase';
 import { PassResetController } from './presentation/controllers/pass-reset.controller';
 
 @Module({
-  imports: [PrismaModule, MailModule, TokenModule],
+  imports: [PrismaModule, MailModule],
   controllers: [PassResetController],
   providers: [
     { provide: PassResetRepository, useClass: PrismaPassResetRepository },
@@ -33,16 +31,13 @@ import { PassResetController } from './presentation/controllers/pass-reset.contr
         repository: PassResetRepository,
         hasher: PasswordHasher,
         verifier: PasswordVerifier,
-        tokenService: TokenService,
         mailer: PassResetMailerService,
         config: AppConfig,
       ) =>
         new PassResetUseCase(
-         
           repository,
           hasher,
           verifier,
-          tokenService,
           mailer,
           config.auth.passwordResetTtlSeconds,
         ),
@@ -50,7 +45,6 @@ import { PassResetController } from './presentation/controllers/pass-reset.contr
         PassResetRepository,
         PasswordHasher,
         PasswordVerifier,
-        TokenService,
         PassResetMailerService,
         APP_CONFIG,
       ],

@@ -3,6 +3,8 @@ import { Test, TestingModule } from '@nestjs/testing';
 import request from 'supertest';
 import { App } from 'supertest/types';
 import { AppModule } from '../../src/app/app.module';
+import { MongooseService } from '../../src/core/database/mongoose.service';
+import { PrismaService } from '../../src/core/database/prisma.service';
 import type { HealthResponse } from '../../src/features/health/health.service';
 
 describe('Application (e2e)', () => {
@@ -11,7 +13,12 @@ describe('Application (e2e)', () => {
   beforeEach(async () => {
     const moduleFixture: TestingModule = await Test.createTestingModule({
       imports: [AppModule],
-    }).compile();
+    })
+      .overrideProvider(PrismaService)
+      .useValue({})
+      .overrideProvider(MongooseService)
+      .useValue({})
+      .compile();
 
     app = moduleFixture.createNestApplication();
     app.setGlobalPrefix('api');
@@ -22,9 +29,9 @@ describe('Application (e2e)', () => {
     await app.init();
   });
 
-  it('GET /api/v1/health', async () => {
+  it('GET /api/v1/health/status', async () => {
     const response = await request(app.getHttpServer())
-      .get('/api/v1/health')
+      .get('/api/v1/health/status')
       .expect(200);
 
     const body = response.body as HealthResponse;

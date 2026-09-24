@@ -1,7 +1,7 @@
 import { Module } from '@nestjs/common';
 import { PrismaModule } from '../../../core/database/prisma.module';
-import { TokenModule } from '../../../core/token/token.module';
-import { TokenService } from '../../../core/token/token.service';
+import { AuthModule } from '../../../core/auth/auth.module';
+import { SessionService } from '../../../core/auth/services/session.service';
 import { PrismaLoginUserRepository } from './data/repositories/login-user.repository';
 import { ScryptPasswordVerifier } from './data/services/scrypt-password-verifier.service';
 import { LoginUserRepository } from './domain/contracts/login-user.repository';
@@ -10,7 +10,7 @@ import { LoginUseCase } from './domain/usecases/login.usecase';
 import { LoginController } from './presentation/login.controller';
 
 @Module({
-  imports: [PrismaModule, TokenModule],
+  imports: [PrismaModule, AuthModule],
   controllers: [LoginController],
   providers: [
     {
@@ -26,9 +26,9 @@ import { LoginController } from './presentation/login.controller';
       useFactory: (
         repository: LoginUserRepository,
         passwordVerifier: PasswordVerifier,
-        tokenService: TokenService,
-      ) => new LoginUseCase(repository, passwordVerifier, tokenService),
-      inject: [LoginUserRepository, PasswordVerifier, TokenService],
+        sessions: SessionService,
+      ) => new LoginUseCase(repository, passwordVerifier, sessions),
+      inject: [LoginUserRepository, PasswordVerifier, SessionService],
     },
   ],
 })

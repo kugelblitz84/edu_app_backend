@@ -8,6 +8,7 @@ import {
   UnauthorizedException,
 } from '@nestjs/common';
 import type { Request } from 'express';
+import { Public } from '../../../../core/auth/decorators/public.decorator';
 import { APP_CONFIG, type AppConfig } from '../../../../core/config/app-config';
 import { ZodValidationPipe } from '../../../../core/validator/zod-validation.pipe';
 import {
@@ -30,6 +31,7 @@ export class LoginController {
   ) {}
 
   @Post('login')
+  @Public()
   async login(
     @Body(new ZodValidationPipe(loginRequestSchema)) request: LoginRequestDto,
     @Req() httpRequest: Request,
@@ -40,6 +42,7 @@ export class LoginController {
         await this.loginUser.execute(request, {
           ipAddress: httpRequest.ip,
           ipRegion: region ? region.toUpperCase() : undefined,
+          userAgent: httpRequest.get('user-agent'),
         }),
       );
     } catch (error) {

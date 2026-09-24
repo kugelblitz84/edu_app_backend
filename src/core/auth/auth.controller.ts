@@ -4,18 +4,24 @@ import {
   HttpCode,
   HttpStatus,
   Post,
+  Req,
   UnauthorizedException,
 } from '@nestjs/common';
+import type { Request } from 'express';
 import { z } from 'zod';
 import { ZodValidationPipe } from '../validator/zod-validation.pipe';
-import { TokenService } from './token.service';
+import { Public } from './decorators/public.decorator';
+import {
+  InvalidRefreshTokenError,
+  SessionService,
+} from './services/session.service';
 
 const refreshTokenRequestSchema = z
   .object({
     refreshToken: z
       .string({ error: 'Refresh token is required.' })
       .min(1, 'Refresh token is required.')
-      .max(4096, 'Refresh token is invalid.'),
+      .max(128, 'Refresh token is invalid.'),
   })
   .strict();
 
@@ -29,28 +35,33 @@ export interface RefreshTokenResponseDto {
 }
 
 @Controller({ path: 'auth', version: '1' })
-export class TokenController {
-  constructor(private readonly tokenService: TokenService) {}
+export class AuthController {
+  constructor(private readonly sessions: SessionService) {}
 
+  @Public()
   @Post('refresh')
   @HttpCode(HttpStatus.OK)
-  refresh(
+  async refresh(
     @Body(new ZodValidationPipe(refreshTokenRequestSchema))
-    request: RefreshTokenRequestDto,
-  ): RefreshTokenResponseDto {
+    input: RefreshTokenRequestDto,
+    @Req() request: Request,
+  ): Promise<RefreshTokenResponseDto> {
     try {
-      const tokens = this.tokenService.verifyRefreshToken(request.refreshToken);
-
+      const tokens = await this.sessions.rotate(input.refreshToken, {
+        ipAddress: request.ip,
+        userAgent: request.get('user-agent'),
+      });
       return {
         accessToken: tokens.accessToken,
         refreshToken: tokens.refreshToken,
         tokenType: 'Bearer',
         expiresIn: tokens.accessTokenExpiresIn,
       };
-    } catch {
-      throw new UnauthorizedException(
-        'The refresh token is invalid or expired.',
-      );
+    } catch (error) {
+      if (error instanceof InvalidRefreshTokenError) {
+        throw new UnauthorizedException(error.message);
+      }
+      throw error;
     }
   }
 }

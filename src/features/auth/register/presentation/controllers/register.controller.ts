@@ -2,12 +2,12 @@ import {
   Body,
   ConflictException,
   Controller,
-  Headers,
   Post,
-  UnauthorizedException,
   UnprocessableEntityException,
 } from '@nestjs/common';
-import { TokenService } from '../../../../../core/token/token.service';
+import { CurrentUser } from '../../../../../core/auth/decorators/current-user.decorator';
+import { Public } from '../../../../../core/auth/decorators/public.decorator';
+import type { AuthenticatedUser } from '../../../../../core/auth/auth.types';
 import { ZodValidationPipe } from '../../../../../core/validator/zod-validation.pipe';
 import {
   InstitutionRegistrationConflictError,
@@ -37,10 +37,10 @@ export class RegisterController {
   constructor(
     private readonly registerUser: RegisterUserUseCase,
     private readonly registerInstitutionUseCase: RegisterInstitutionUseCase,
-    private readonly tokenService: TokenService,
   ) {}
 
   @Post('register/user')
+  @Public()
   async register(
     @Body(new ZodValidationPipe(registerUserRequestSchema))
     request: RegisterUserRequestDto,
@@ -69,21 +69,12 @@ export class RegisterController {
   async registerInstitution(
     @Body(new ZodValidationPipe(registerInstitutionRequestSchema))
     request: RegisterInstitutionRequestDto,
-    @Headers('authorization') authorization?: string,
+    @CurrentUser() currentUser: AuthenticatedUser,
   ): Promise<RegisterInstitutionResponseDto> {
-    const accessToken = this.readBearerToken(authorization);
-    let userId: string;
-
-    try {
-      userId = this.tokenService.verify(accessToken).userId;
-    } catch {
-      throw new UnauthorizedException('A valid access token is required.');
-    }
-
     try {
       const institution = await this.registerInstitutionUseCase.execute(
         request,
-        userId,
+        currentUser.userId,
       );
 
       return toRegisterInstitutionResponseDto(institution);
@@ -94,14 +85,5 @@ export class RegisterController {
 
       throw error;
     }
-  }
-
-  private readBearerToken(authorization?: string): string {
-    const match = authorization?.match(/^Bearer ([^\s]+)$/i);
-    if (!match || match[1].length > 4096) {
-      throw new UnauthorizedException('A valid access token is required.');
-    }
-
-    return match[1];
   }
 }

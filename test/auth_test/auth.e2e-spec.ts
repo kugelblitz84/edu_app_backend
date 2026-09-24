@@ -1,18 +1,19 @@
 import { INestApplication, VersioningType } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
-import { randomUUID } from 'node:crypto';
+import { randomBytes, randomUUID } from 'node:crypto';
 import request from 'supertest';
 import { App } from 'supertest/types';
 import { ConfigModule } from '../../src/core/config/config.module';
 import { PrismaService } from '../../src/core/database/prisma.service';
 import { AuthModule } from '../../src/features/auth/auth.module';
+import type { AuthTokenPair } from '../../src/core/auth/auth.types';
+import { SessionService } from '../../src/core/auth/services/session.service';
 import { LoginUserRepository } from '../../src/features/auth/login/domain/contracts/login-user.repository';
 import type { LoginUserRecord } from '../../src/features/auth/login/domain/contracts/types';
 import type { LoginResponseDto } from '../../src/features/auth/login/presentation/login.dto';
 import { RegisterUserRepository } from '../../src/features/auth/register/domain/contracts/register-user.repository';
 import type { CreateUserRecord } from '../../src/features/auth/register/domain/contracts/types';
 import type { RegisteredUser } from '../../src/features/auth/register/domain/entities/registered-user.entity';
-import type { UserStatus } from '../../src/features/auth/register/domain/entities/registered-user.entity';
 import { RegistrationConflictError } from '../../src/features/auth/register/domain/errors/registration.error';
 import type { RegisterUserResponseDto } from '../../src/features/auth/register/presentation/dto/register-user-response.dto';
 
@@ -42,6 +43,7 @@ class InMemoryAuthUserRepository
   }
 
   async createGuestUser(user: CreateUserRecord): Promise<RegisteredUser> {
+    await Promise.resolve();
     if (
       [...this.users.values()].some((record) => record.email === user.email)
     ) {
@@ -73,16 +75,18 @@ class InMemoryAuthUserRepository
       email: storedUser.email,
       username: storedUser.username,
       platformRole: storedUser.platformRole,
-      status: storedUser.status as UserStatus,
+      status: storedUser.status,
       createdAt: storedUser.createdAt,
     };
   }
 
   async findByUsername(username: string): Promise<LoginUserRecord | null> {
+    await Promise.resolve();
     return this.users.get(username) ?? null;
   }
 
   async recordSuccessfulLogin(userId: string, loggedInAt: Date): Promise<void> {
+    await Promise.resolve();
     const user = [...this.users.values()].find(
       (record) => record.id === userId,
     );
@@ -120,6 +124,16 @@ function expectJwtLikeToken(token: string) {
   expect(token.split('.')).toHaveLength(3);
 }
 
+class InMemorySessionService {
+  create(): Promise<AuthTokenPair> {
+    return Promise.resolve({
+      accessToken: 'eyJhbGciOiJIUzI1NiJ9.eyJ0eXBlIjoiYWNjZXNzIn0.signature',
+      refreshToken: `${randomUUID()}.${randomBytes(32).toString('base64url')}`,
+      accessTokenExpiresIn: 900,
+    });
+  }
+}
+
 describe('Auth module (e2e)', () => {
   let app: INestApplication<App>;
   let repository: InMemoryAuthUserRepository;
@@ -136,6 +150,8 @@ describe('Auth module (e2e)', () => {
       .useValue(repository)
       .overrideProvider(LoginUserRepository)
       .useValue(repository)
+      .overrideProvider(SessionService)
+      .useClass(InMemorySessionService)
       .compile();
 
     app = moduleFixture.createNestApplication();
@@ -159,7 +175,7 @@ describe('Auth module (e2e)', () => {
   it('registers a new user, rejects duplicates, logs in, returns tokens, and records the login', async () => {
     const user = uniqueAuthSubject();
     const registerResponse = await request(app.getHttpServer())
-      .post('/api/v1/auth/register')
+      .post('/api/v1/auth/register/user')
       .send({
         email: `  ${user.email.toUpperCase()}  `,
         username: `  ${user.username}  `,
@@ -169,14 +185,14 @@ describe('Auth module (e2e)', () => {
 
     const registeredUser = registerResponse.body as RegisterUserResponseDto;
 
-    expect(registeredUser).toEqual({
-      id: expect.any(String),
+    expect(registeredUser).toMatchObject({
       email: user.email,
       username: user.username,
       platformRole: 'GUEST',
       status: 'ACTIVE',
-      createdAt: expect.any(String),
     });
+    expect(typeof registeredUser.id).toBe('string');
+    expect(typeof registeredUser.createdAt).toBe('string');
     expect(Date.parse(registeredUser.createdAt)).not.toBeNaN();
     expect(registeredUser).not.toHaveProperty('password');
     expect(registeredUser).not.toHaveProperty('passwordHash');
@@ -187,15 +203,15 @@ describe('Auth module (e2e)', () => {
       email: user.email,
       username: user.username,
       fullName: user.username,
-      passwordHash: expect.any(String),
       platformRole: 'GUEST',
       status: 'ACTIVE',
       lastLoginAt: null,
     });
+    expect(typeof persistedUserAfterRegister?.passwordHash).toBe('string');
     expect(persistedUserAfterRegister?.passwordHash).not.toBe(user.password);
 
     const duplicateEmailResponse = await request(app.getHttpServer())
-      .post('/api/v1/auth/register')
+      .post('/api/v1/auth/register/user')
       .send({
         email: user.email,
         username: 'ae2e_duplicate_email_user',
@@ -210,7 +226,7 @@ describe('Auth module (e2e)', () => {
     });
 
     const duplicateUsernameResponse = await request(app.getHttpServer())
-      .post('/api/v1/auth/register')
+      .post('/api/v1/auth/register/user')
       .send({
         email: `new_${user.email}`,
         username: user.username,
@@ -248,7 +264,7 @@ describe('Auth module (e2e)', () => {
 
     const loggedInUser = loginResponse.body as LoginResponseDto;
 
-    expect(loggedInUser).toEqual({
+    expect(loggedInUser).toMatchObject({
       user: {
         id: registeredUser.id,
         username: user.username,
@@ -256,13 +272,15 @@ describe('Auth module (e2e)', () => {
         fullName: user.username,
         platformRole: 'GUEST',
       },
-      accessToken: expect.any(String),
-      refreshToken: expect.any(String),
       tokenType: 'Bearer',
-      expiresIn: expect.any(Number),
     });
+    expect(typeof loggedInUser.accessToken).toBe('string');
+    expect(typeof loggedInUser.refreshToken).toBe('string');
+    expect(typeof loggedInUser.expiresIn).toBe('number');
     expectJwtLikeToken(loggedInUser.accessToken);
-    expectJwtLikeToken(loggedInUser.refreshToken);
+    expect(loggedInUser.refreshToken).toMatch(
+      /^[0-9a-f-]{36}\.[A-Za-z0-9_-]{43}$/i,
+    );
     expect(loggedInUser.expiresIn).toBeGreaterThan(0);
     expect(repository.getByUsername(user.username)?.lastLoginAt).toBeInstanceOf(
       Date,
@@ -271,7 +289,7 @@ describe('Auth module (e2e)', () => {
 
   it('rejects invalid registration requests with detailed violations', async () => {
     const response = await request(app.getHttpServer())
-      .post('/api/v1/auth/register')
+      .post('/api/v1/auth/register/user')
       .send({
         email: 'not-an-email',
         username: 'ab',
@@ -304,18 +322,21 @@ describe('Auth module (e2e)', () => {
       })
       .expect(400);
 
-    expect(invalidLoginResponse.body as ErrorResponseBody).toMatchObject({
+    const invalidLoginBody = invalidLoginResponse.body as ErrorResponseBody;
+    expect(invalidLoginBody).toMatchObject({
       message: 'Invalid request.',
-      violations: expect.arrayContaining([
+    });
+    expect(invalidLoginBody.violations).toEqual(
+      expect.arrayContaining([
         'Username is required.',
         'Password is required.',
       ]),
-    });
+    );
 
     const user = uniqueAuthSubject();
 
     await request(app.getHttpServer())
-      .post('/api/v1/auth/register')
+      .post('/api/v1/auth/register/user')
       .send(user)
       .expect(201);
 

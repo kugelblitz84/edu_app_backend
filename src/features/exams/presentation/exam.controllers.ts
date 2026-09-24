@@ -5,11 +5,11 @@ import {
   ParseUUIDPipe,
   Patch,
   Post,
-  Req,
 } from '@nestjs/common';
+import { CurrentUser } from '../../../core/auth/decorators/current-user.decorator';
+import type { AuthenticatedUser } from '../../../core/auth/auth.types';
 import { ZodValidationPipe } from '../../../core/validator/zod-validation.pipe';
 import { ExamUseCases } from '../domain/exam.usecases';
-import type { AuthenticatedExamRequest } from './exam-auth.middleware';
 import {
   createExamSchema,
   scheduleExamSchema,
@@ -30,9 +30,9 @@ export class ExamController {
   @Post('/create')
   async create(
     @Body(new ZodValidationPipe(createExamSchema)) input: CreateExamRequestDto,
-    @Req() request: AuthenticatedExamRequest,
+    @CurrentUser() currentUser: AuthenticatedUser,
   ): Promise<ExamResponseDto> {
-    return this.useCases.createDraft(request.userId, input);
+    return this.useCases.createDraft(currentUser.userId, input);
   }
 
   @Patch(':id/schedule')
@@ -40,9 +40,9 @@ export class ExamController {
     @Param('id', ParseUUIDPipe) id: string,
     @Body(new ZodValidationPipe(scheduleExamSchema))
     input: ScheduleExamRequestDto,
-    @Req() request: AuthenticatedExamRequest,
+    @CurrentUser() currentUser: AuthenticatedUser,
   ): Promise<ExamResponseDto> {
-    return this.useCases.schedule(id, request.userId, input);
+    return this.useCases.schedule(id, currentUser.userId, input);
   }
 
   @Patch(':id/metadata')
@@ -50,9 +50,9 @@ export class ExamController {
     @Param('id', ParseUUIDPipe) id: string,
     @Body(new ZodValidationPipe(updateExamMetadataSchema))
     input: UpdateExamMetadataRequestDto,
-    @Req() request: AuthenticatedExamRequest,
+    @CurrentUser() currentUser: AuthenticatedUser,
   ): Promise<ExamResponseDto> {
-    return this.useCases.updateMetadata(id, request.userId, input);
+    return this.useCases.updateMetadata(id, currentUser.userId, input);
   }
 
   @Patch(':id/content')
@@ -60,8 +60,8 @@ export class ExamController {
     @Param('id', ParseUUIDPipe) id: string,
     @Body(new ZodValidationPipe(updateExamContentSchema))
     input: UpdateExamContentRequestDto,
-    @Req() request: AuthenticatedExamRequest,
+    @CurrentUser() currentUser: AuthenticatedUser,
   ): Promise<ExamContentResponseDto> {
-    return this.useCases.updateContent(id, request.userId, input);
+    return this.useCases.updateContent(id, currentUser.userId, input);
   }
 }

@@ -1,8 +1,9 @@
-import { TokenService } from '../../../../../core/token/token.service';
+import { SessionService } from '../../../../../core/auth/services/session.service';
 import type {
-  AccessTokenSubject,
-  GeneratedTokenPair,
-} from '../../../../../core/token/token.entities';
+  AuthTokenPair,
+  SessionMetadata,
+  SessionUser,
+} from '../../../../../core/auth/auth.types';
 import { LoginUserRepository } from '../contracts/login-user.repository';
 import type { LoginUserRecord } from '../contracts/types';
 import { PasswordVerifier } from '../contracts/password-verifier.service';
@@ -48,16 +49,21 @@ class FakePasswordVerifier implements PasswordVerifier {
   }
 }
 
-class FakeTokenGenerator implements Pick<TokenService, 'generate'> {
-  public subject?: AccessTokenSubject;
+class FakeTokenGenerator implements Pick<SessionService, 'create'> {
+  public subject?: SessionUser;
+  public metadata?: SessionMetadata;
 
-  generate(subject: AccessTokenSubject): GeneratedTokenPair {
+  create(
+    subject: SessionUser,
+    metadata?: SessionMetadata,
+  ): Promise<AuthTokenPair> {
     this.subject = subject;
-    return {
+    this.metadata = metadata;
+    return Promise.resolve({
       accessToken: 'access-token',
       refreshToken: 'refresh-token',
       accessTokenExpiresIn: 900,
-    };
+    });
   }
 }
 
@@ -78,11 +84,8 @@ describe(LoginUseCase.name, () => {
 
     expect(tokenGenerator.subject).toEqual({
       userId: ACTIVE_USER.id,
-      username: ACTIVE_USER.username,
-      email: ACTIVE_USER.email,
       platformRole: 'GUEST',
       status: 'ACTIVE',
-      emailVerified: true,
     });
     expect(result).toMatchObject({
       user: {

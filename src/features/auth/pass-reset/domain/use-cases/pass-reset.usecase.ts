@@ -1,8 +1,4 @@
 import { createHash, randomBytes } from 'node:crypto';
-import {
-  TokenService,
-} from '../../../../../core/token/token.service';
-import type { VerifiedAccessToken } from '../../../../../core/token/token.entities';
 import { PasswordVerifier } from '../../../login/domain/contracts/password-verifier.service';
 import { PasswordHasher } from '../../../register/domain/contracts/password-hasher.service';
 import { PassResetMailerService } from '../contracts/pass-reset-mailer.service';
@@ -24,7 +20,6 @@ export class PassResetUseCase {
     private readonly repository: PassResetRepository,
     private readonly passwordHasher: PasswordHasher,
     private readonly passwordVerifier: PasswordVerifier,
-    private readonly tokenService: Pick<TokenService, 'verify'>,
     private readonly mailer: PassResetMailerService,
     private readonly resetTtlSeconds: number,
   ) {}
@@ -58,25 +53,19 @@ export class PassResetUseCase {
   }
 
   async changeAuthenticated(input: {
-    accessToken: string;
+    userId: string;
+    accessTokenIssuedAt: Date;
     currentPassword: string;
     newPassword: string;
     ipAddress?: string;
     ipRegion?: string;
   }): Promise<AuthenticatedResetResult> {
-    let subject: VerifiedAccessToken;
-    try {
-      subject = this.tokenService.verify(input.accessToken);
-    } catch {
-      throw new InvalidAccessTokenError();
-    }
-
-    const user = await this.repository.findUserById(subject.userId);
+    const user = await this.repository.findUserById(input.userId);
     if (
       !user ||
       user.status !== 'ACTIVE' ||
       (user.passwordChangedAt &&
-        subject.issuedAt.getTime() <
+        input.accessTokenIssuedAt.getTime() <
           Math.floor(user.passwordChangedAt.getTime() / 1000) * 1000)
     ) {
       throw new InvalidAccessTokenError();

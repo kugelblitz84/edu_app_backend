@@ -1,6 +1,4 @@
-import type {
-  PlatformRole,
-} from '../../../register/domain/entities/registered-user.entity';
+import type { PlatformRole } from '../../../register/domain/entities/registered-user.entity';
 
 export interface LoggedInUser {
   user: {

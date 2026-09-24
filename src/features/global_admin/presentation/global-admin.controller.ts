@@ -6,11 +6,11 @@ import {
   ParseUUIDPipe,
   Patch,
   Query,
-  Req,
 } from '@nestjs/common';
+import { CurrentUser } from '../../../core/auth/decorators/current-user.decorator';
+import type { AuthenticatedUser } from '../../../core/auth/auth.types';
 import { ZodValidationPipe } from '../../../core/validator/zod-validation.pipe';
 import type { ReviewPageOptions } from '../domain/contracts/types';
-import type { GlobalAdminRequest } from './global-admin-auth.middleware';
 import { GlobalAdminUseCases } from '../domain/usecases';
 import {
   approvalResponseSchema,
@@ -51,10 +51,10 @@ export class GlobalAdminController {
   async getRespondedByMe(
     @Query(new ZodValidationPipe(respondedReviewQuerySchema))
     options: ReviewPageOptions,
-    @Req() request: GlobalAdminRequest,
+    @CurrentUser() currentUser: AuthenticatedUser,
   ): Promise<ApprovedOrRejectedByMeResponseDto> {
     const result = await this.useCases.getRespondedBy(
-      request.globalAdminUserId,
+      currentUser.userId,
       options,
     );
     return {
@@ -77,9 +77,9 @@ export class GlobalAdminController {
     @Param('id', new ParseUUIDPipe()) id: string,
     @Body(new ZodValidationPipe(approvalResponseSchema))
     decision: ApprovalResponseInstitutionRequestDto,
-    @Req() request: GlobalAdminRequest,
+    @CurrentUser() currentUser: AuthenticatedUser,
   ): Promise<InstitutionDecisionResponseDto> {
-    const result = await this.useCases.respond(id, request.globalAdminUserId, {
+    const result = await this.useCases.respond(id, currentUser.userId, {
       verdict: decision.status,
       rejectReason: decision.rejectReason,
       notes: decision.notes,

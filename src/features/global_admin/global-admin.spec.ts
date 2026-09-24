@@ -2,11 +2,12 @@ import { INestApplication, VersioningType } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
 import type { Server } from 'node:http';
 import request from 'supertest';
-import { TokenService } from '../../core/token/token.service';
+import { Reflector } from '@nestjs/core';
+import { AccessTokenGuard } from '../../core/auth/guards/access-token.guard';
+import type { AccessTokenService } from '../../core/auth/services/access-token.service';
 import type { InstitutionReview } from './domain/contracts/types';
 import { InstitutionCodeConflictError } from './domain/contracts/services';
 import { GlobalAdminUseCases } from './domain/usecases';
-import { GlobalAdminAuthMiddleware } from './presentation/global-admin-auth.middleware';
 import { GlobalAdminController } from './presentation/global-admin.controller';
 
 const institutionId = '3bb216fa-38a6-4a3c-bb7d-c2ee47e26140';
@@ -52,17 +53,17 @@ describe('global-admin endpoints', () => {
 
     const module = await Test.createTestingModule({
       controllers: [GlobalAdminController],
-      providers: [
-        GlobalAdminAuthMiddleware,
-        { provide: GlobalAdminUseCases, useValue: useCases },
-        { provide: TokenService, useValue: tokenService },
-      ],
+      providers: [{ provide: GlobalAdminUseCases, useValue: useCases }],
     }).compile();
 
     app = module.createNestApplication();
     app.enableVersioning({ type: VersioningType.URI });
-    const middleware = module.get(GlobalAdminAuthMiddleware);
-    app.use(middleware.use.bind(middleware));
+    app.useGlobalGuards(
+      new AccessTokenGuard(
+        new Reflector(),
+        tokenService as unknown as AccessTokenService,
+      ),
+    );
     await app.init();
     server = app.getHttpServer() as Server;
   });

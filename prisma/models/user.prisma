@@ -38,10 +38,30 @@ model User {
   institutionAdminships InstitutionAdmin[]
   personalExams         PersonalExam[]
   institutionExams      InstitutionExam[]
+  authSession           AuthSession[]
 
   @@index([platformRole])
   @@index([status])
   @@index([username])
   @@index([createdAt])
   @@map("users")
+}
+
+model AuthSession {
+  id                 String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId             String    @map("user_id") @db.Uuid
+  refreshTokenDigest String    @unique @map("refresh_token_digest") @db.VarChar(64)
+  expiresAt          DateTime  @map("expires_at") @db.Timestamptz
+  revokedAt          DateTime? @map("revoked_at") @db.Timestamptz
+  createdAt          DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  rotatedAt          DateTime? @map("rotated_at") @db.Timestamptz
+  lastSeenAt         DateTime? @map("last_seen_at") @db.Timestamptz
+  ipAddress          String?   @map("ip_address") @db.VarChar(45)
+  userAgent          String?   @map("user_agent") @db.VarChar(512)
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([expiresAt])
+  @@map("auth_sessions")
 }

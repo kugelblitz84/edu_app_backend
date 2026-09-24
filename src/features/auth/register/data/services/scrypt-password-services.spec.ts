@@ -9,7 +9,6 @@ const config: AppConfig = {
   databaseUrl: 'postgres://unused',
   auth: {
     accessTokenSecret: 'a'.repeat(32),
-    refreshTokenSecret: 'b'.repeat(32),
     accessTokenTtlSeconds: 900,
     refreshTokenTtlSeconds: 2_592_000,
     issuer: 'edu-app-api',

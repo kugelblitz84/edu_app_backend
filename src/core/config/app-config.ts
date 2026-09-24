@@ -12,7 +12,6 @@ export interface AppConfig {
   mongodbUrl: string;
   auth: {
     accessTokenSecret: string;
-    refreshTokenSecret: string;
     accessTokenTtlSeconds: number;
     refreshTokenTtlSeconds: number;
     issuer: string;
@@ -172,19 +171,6 @@ export function loadAppConfig(): AppConfig {
     nodeEnv,
     'development-access-token-secret-change-me',
   );
-  const refreshTokenSecret = loadTokenSecret(
-    'JWT_REFRESH_SECRET',
-    process.env.JWT_REFRESH_SECRET,
-    nodeEnv,
-    'development-refresh-token-secret-change-me',
-  );
-
-  if (accessTokenSecret === refreshTokenSecret) {
-    throw new Error(
-      'JWT_ACCESS_SECRET and JWT_REFRESH_SECRET must be different.',
-    );
-  }
-
   if (nodeEnv === 'production' && !smtpHost) {
     throw new Error('SMTP_HOST is required in production.');
   }
@@ -207,7 +193,6 @@ export function loadAppConfig(): AppConfig {
     mongodbUrl: loadMongodbUrl(process.env.MONGODB_URL),
     auth: {
       accessTokenSecret,
-      refreshTokenSecret,
       accessTokenTtlSeconds: parsePositiveInteger(
         'JWT_ACCESS_TTL_SECONDS',
         process.env.JWT_ACCESS_TTL_SECONDS,

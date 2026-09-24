@@ -1,4 +1,4 @@
-import { TokenService } from '../../../../../core/token/token.service';
+import { SessionService } from '../../../../../core/auth/services/session.service';
 import { LoginUserRepository } from '../contracts/login-user.repository';
 import { PasswordVerifier } from '../contracts/password-verifier.service';
 import type { LoggedInUser } from '../entities/logged-in-user.entity';
@@ -15,13 +15,14 @@ export interface LoginInput {
 export interface LoginContext {
   ipAddress?: string;
   ipRegion?: string;
+  userAgent?: string;
 }
 
 export class LoginUseCase {
   constructor(
     private readonly repository: LoginUserRepository,
     private readonly passwordVerifier: PasswordVerifier,
-    private readonly tokenService: Pick<TokenService, 'generate'>,
+    private readonly sessions: Pick<SessionService, 'create'>,
   ) {}
 
   async execute(
@@ -49,14 +50,17 @@ export class LoginUseCase {
       throw new LoginNotAllowedError();
     }
 
-    const tokens = this.tokenService.generate({
-      userId: user.id,
-      username: user.username,
-      email: user.email,
-      platformRole: user.platformRole,
-      status: user.status,
-      emailVerified: user.emailVerifiedAt !== null,
-    });
+    const tokens = await this.sessions.create(
+      {
+        userId: user.id,
+        platformRole: user.platformRole,
+        status: user.status,
+      },
+      {
+        ipAddress: context.ipAddress,
+        userAgent: context.userAgent,
+      },
+    );
 
     await this.repository.recordSuccessfulLogin(
       user.id,

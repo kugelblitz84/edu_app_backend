@@ -19,7 +19,7 @@ export class RegisterInstitutionUseCase {
     const logoUrl = input.logo_url?.trim() || undefined;
     const description = input.description?.trim() || undefined;
     const status = 'PENDING_APPROVAL';
-    
+
     return this.repository.createInstitution({
       name,
       slug,
