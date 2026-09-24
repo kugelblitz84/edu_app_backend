@@ -26,7 +26,6 @@ export const questionSchema = new mongoose.Schema(
 export const examDataSchema = new mongoose.Schema(
   {
     examId: {
-      // InstitutionExam.id is a PostgreSQL UUID, not a Mongo ObjectId.
       type: String,
       required: true,
       unique: true,
