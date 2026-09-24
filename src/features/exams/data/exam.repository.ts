@@ -11,6 +11,8 @@ import type {
   CreateDraftExamInput,
   InstitutionExam,
   ScheduleExamInput,
+  UpdateExamContentInput,
+  UpdateExamMetadataInput,
 } from '../domain/exam.types';
 
 @Injectable()
@@ -88,6 +90,44 @@ export class PrismaMongoExamRepository implements ExamRepository {
     });
     if (result.count === 0) return null;
     return this.prisma.institutionExam.findUnique({ where: { id } });
+  }
+
+  async updateMetadata(
+    id: string,
+    input: UpdateExamMetadataInput,
+  ): Promise<InstitutionExam | null> {
+    const result = await this.prisma.institutionExam.updateMany({
+      where: {
+        id,
+        status: { in: ['DRAFT', 'SCHEDULED'] },
+        deletedAt: null,
+      },
+      data: input,
+    });
+    if (result.count === 0) return null;
+    return this.prisma.institutionExam.findUnique({ where: { id } });
+  }
+
+  async updateContent(
+    examId: string,
+    input: UpdateExamContentInput,
+  ): Promise<ExamData | null> {
+    const questions = input.questions;
+    if (!questions) return null;
+
+    return this.examDataModel
+      .findOneAndUpdate(
+        { examId },
+        {
+          $set: {
+            questions,
+            totalQuestions: questions.length,
+          },
+        },
+        { new: true, runValidators: true },
+      )
+      .lean<ExamData>()
+      .exec();
   }
 
   private get examDataModel(): Model<ExamData> {

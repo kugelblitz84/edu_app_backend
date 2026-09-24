@@ -2,7 +2,10 @@ import type {
   CreateDraftExamInput,
   InstitutionExam,
   ScheduleExamInput,
+  UpdateExamContentInput,
+  UpdateExamMetadataInput,
 } from './exam.types';
+import type { ExamData } from '../../../../mongoose/models/exam-data.model';
 
 export abstract class ExamRepository {
   abstract createDraft(
@@ -20,4 +23,12 @@ export abstract class ExamRepository {
     id: string,
     input: Pick<ScheduleExamInput, 'examDate' | 'durationMinutes'>,
   ): Promise<InstitutionExam | null>;
+  abstract updateMetadata(
+    id: string,
+    input: UpdateExamMetadataInput,
+  ): Promise<InstitutionExam | null>;
+  abstract updateContent(
+    examId: string,
+    input: UpdateExamContentInput,
+  ): Promise<ExamData | null>;
 }

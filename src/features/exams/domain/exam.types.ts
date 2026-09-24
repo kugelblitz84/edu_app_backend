@@ -28,3 +28,14 @@ export interface ScheduleExamInput {
   durationMinutes: number;
   questions: ExamQuestion[];
 }
+
+export interface UpdateExamMetadataInput {
+  name?: string;
+  description?: string | null;
+  examDate?: Date | null;
+  durationMinutes?: number | null;
+}
+
+export interface UpdateExamContentInput {
+  questions?: ExamQuestion[];
+}

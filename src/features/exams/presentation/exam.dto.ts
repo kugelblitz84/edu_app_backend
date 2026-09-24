@@ -8,7 +8,7 @@ export const createExamSchema = z
   })
   .strict();
 
-const questionSchema = z
+export const examQuestionSchema = z
   .object({
     question: z.string().trim().min(1),
     options: z.array(z.string().trim().min(1)).min(2),
@@ -30,12 +30,40 @@ export const scheduleExamSchema = z
   .object({
     examDate: z.iso.datetime({ offset: true }),
     durationMinutes: z.number().int().positive(),
-    questions: z.array(questionSchema).min(1),
+    questions: z.array(examQuestionSchema).min(1),
   })
   .strict();
 
 export type CreateExamRequestDto = z.infer<typeof createExamSchema>;
 export type ScheduleExamRequestDto = z.infer<typeof scheduleExamSchema>;
+
+export const updateExamMetadataSchema = z
+  .object({
+    name: z.string().trim().min(1).max(200).optional(),
+    description: z.string().trim().min(1).max(1000).nullable().optional(),
+    examDate: z.iso.datetime({ offset: true }).nullable().optional(),
+    durationMinutes: z.number().int().positive().nullable().optional(),
+  })
+  .strict()
+  .refine((input) => Object.keys(input).length > 0, {
+    message: 'At least one metadata field is required.',
+  });
+
+export const updateExamContentSchema = z
+  .object({
+    questions: z.array(examQuestionSchema).min(1).optional(),
+  })
+  .strict()
+  .refine((input) => Object.keys(input).length > 0, {
+    message: 'At least one content field is required.',
+  });
+
+export type UpdateExamMetadataRequestDto = z.infer<
+  typeof updateExamMetadataSchema
+>;
+export type UpdateExamContentRequestDto = z.infer<
+  typeof updateExamContentSchema
+>;
 
 export interface ExamResponseDto {
   id: string;
@@ -48,4 +76,10 @@ export interface ExamResponseDto {
   createdByUserId: string;
   createdAt: Date;
   updatedAt: Date;
+}
+
+export interface ExamContentResponseDto {
+  examId: string;
+  totalQuestions: number;
+  questions: z.infer<typeof examQuestionSchema>[];
 }

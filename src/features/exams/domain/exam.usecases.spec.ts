@@ -33,17 +33,23 @@ function repositoryMock() {
   const findAccessibleById = jest.fn();
   const upsertExamData = jest.fn();
   const scheduleDraft = jest.fn();
+  const updateMetadata = jest.fn();
+  const updateContent = jest.fn();
   const repository: jest.Mocked<ExamRepository> = {
     createDraft: jest.fn(),
     findAccessibleById,
     upsertExamData,
     scheduleDraft,
+    updateMetadata,
+    updateContent,
   };
   return {
     repository,
     findAccessibleById,
     upsertExamData,
     scheduleDraft,
+    updateMetadata,
+    updateContent,
   };
 }
 
@@ -130,5 +136,58 @@ describe('ExamUseCases scheduling', () => {
       draft.id,
       request.questions,
     );
+  });
+});
+
+describe('ExamUseCases updates', () => {
+  it('updates only the supplied PostgreSQL metadata', async () => {
+    const { repository, findAccessibleById, updateMetadata } = repositoryMock();
+    findAccessibleById.mockResolvedValue(draft);
+    updateMetadata.mockResolvedValue({ ...draft, name: 'Updated final' });
+
+    await new ExamUseCases(repository).updateMetadata(
+      draft.id,
+      draft.createdByUserId,
+      { name: 'Updated final' },
+    );
+
+    expect(updateMetadata).toHaveBeenCalledWith(draft.id, {
+      name: 'Updated final',
+    });
+  });
+
+  it('updates Mongo content for a scheduled exam', async () => {
+    const { repository, findAccessibleById, updateContent } = repositoryMock();
+    findAccessibleById.mockResolvedValue({ ...draft, status: 'SCHEDULED' });
+    updateContent.mockResolvedValue({
+      examId: draft.id,
+      totalQuestions: request.questions.length,
+      questions: request.questions,
+    });
+
+    const result = await new ExamUseCases(repository).updateContent(
+      draft.id,
+      draft.createdByUserId,
+      { questions: request.questions },
+    );
+
+    expect(updateContent).toHaveBeenCalledWith(draft.id, {
+      questions: request.questions,
+    });
+    expect(result.totalQuestions).toBe(1);
+  });
+
+  it('rejects updates after an exam starts running', async () => {
+    const { repository, findAccessibleById, updateMetadata } = repositoryMock();
+    findAccessibleById.mockResolvedValue({ ...draft, status: 'RUNNING' });
+
+    await expect(
+      new ExamUseCases(repository).updateMetadata(
+        draft.id,
+        draft.createdByUserId,
+        { name: 'Too late' },
+      ),
+    ).rejects.toBeInstanceOf(ConflictException);
+    expect(updateMetadata).not.toHaveBeenCalled();
   });
 });
