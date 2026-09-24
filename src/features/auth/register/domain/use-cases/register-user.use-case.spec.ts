@@ -21,7 +21,7 @@ class FakeRegisterUserRepository implements RegisterUserRepository {
       id: '5cae6d1a-930c-45a2-8408-8fb1be8446af',
       email: user.email,
       username: user.username,
-      platformRole: 'GUEST' as const,
+      platformRole: 'PLATFORM_USER' as const,
       status: 'ACTIVE' as const,
       createdAt: new Date('2026-08-03T00:00:00.000Z'),
     });
@@ -49,7 +49,7 @@ describe(RegisterUserUseCase.name, () => {
       passwordHash: 'hashed:StrongPassword123',
       fullName: 'learner_01',
     });
-    expect(user.platformRole).toBe('GUEST');
+    expect(user.platformRole).toBe('PLATFORM_USER');
     expect(user.status).toBe('ACTIVE');
   });
 

@@ -19,7 +19,7 @@ const ACTIVE_USER: LoginUserRecord = {
   username: 'learner_01',
   fullName: 'Test Learner',
   passwordHash: 'stored-hash',
-  platformRole: 'GUEST',
+  platformRole: 'PLATFORM_USER',
   status: 'ACTIVE',
   emailVerifiedAt: new Date('2026-08-01T00:00:00.000Z'),
 };
@@ -84,7 +84,7 @@ describe(LoginUseCase.name, () => {
 
     expect(tokenGenerator.subject).toEqual({
       userId: ACTIVE_USER.id,
-      platformRole: 'GUEST',
+      platformRole: 'PLATFORM_USER',
       status: 'ACTIVE',
     });
     expect(result).toMatchObject({

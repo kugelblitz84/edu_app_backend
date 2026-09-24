@@ -73,7 +73,7 @@ export class AccessTokenService {
       payload.iss !== this.config.auth.issuer ||
       payload.aud !== 'edu-app-api' ||
       payload.tokenType !== 'access' ||
-      (payload.role !== 'GUEST' && payload.role !== 'GLOBAL_ADMIN')
+      (payload.role !== 'PLATFORM_USER' && payload.role !== 'GLOBAL_ADMIN')
     ) {
       throw new Error('Invalid access token');
     }

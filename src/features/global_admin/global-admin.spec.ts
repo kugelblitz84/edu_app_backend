@@ -73,7 +73,7 @@ describe('global-admin endpoints', () => {
   it('forbids authenticated users without the global admin role', async () => {
     tokenService.verify.mockReturnValueOnce({
       userId: adminId,
-      platformRole: 'GUEST',
+      platformRole: 'PLATFORM_USER',
       issuedAt: new Date(),
     });
 

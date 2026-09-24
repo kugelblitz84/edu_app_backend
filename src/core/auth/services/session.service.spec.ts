@@ -30,7 +30,7 @@ const config: AppConfig = {
 
 const user = {
   userId: '5cae6d1a-930c-45a2-8408-8fb1be8446af',
-  platformRole: 'GUEST' as const,
+  platformRole: 'PLATFORM_USER' as const,
   status: 'ACTIVE' as const,
 };
 

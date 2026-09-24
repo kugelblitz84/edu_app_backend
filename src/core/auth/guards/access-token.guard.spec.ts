@@ -26,7 +26,7 @@ describe(AccessTokenGuard.name, () => {
     const request = { get: () => 'Bearer access-token' } as Partial<Request>;
     const subject = {
       userId: 'user-id',
-      platformRole: 'GUEST' as const,
+      platformRole: 'PLATFORM_USER' as const,
       issuedAt: new Date(),
     };
     verify.mockReturnValue(subject);
