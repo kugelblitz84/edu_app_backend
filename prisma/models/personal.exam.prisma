@@ -1,9 +1,9 @@
 enum ExamStatus {
   DRAFT
   SCHEDULED
-  ACTIVE
+  RUNNING
   COMPLETED
-  ARCHIVED
+  // ARCHIVED
   CANCELLED
 
   @@map("exam_status")

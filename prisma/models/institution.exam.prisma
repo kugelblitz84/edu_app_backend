@@ -1,3 +1,13 @@
+// enum ExamStatus {
+//   DRAFT
+//   SCHEDULED
+//   ACTIVE
+//   COMPLETED
+//   CANCELLED
+
+//   @@map("exam_status")
+// }
+
 model InstitutionExam {
   id              String      @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   institutionId   String      @map("institution_id") @db.Uuid
@@ -12,6 +22,7 @@ model InstitutionExam {
   createdAt       DateTime    @default(now()) @map("created_at") @db.Timestamptz
   updatedAt       DateTime    @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
   deletedAt       DateTime?   @map("deleted_at") @db.Timestamptz
+  
 
   @@index([institutionId])
   @@index([createdByUserId])
