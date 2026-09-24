@@ -8,11 +8,9 @@ import {
   HttpStatus,
   Inject,
   Logger,
-  PipeTransform,
   Post,
   Req,
   UnauthorizedException,
-  UnprocessableEntityException,
 } from '@nestjs/common';
 import { createHash } from 'node:crypto';
 import type { Request } from 'express';
@@ -20,6 +18,7 @@ import {
   APP_CONFIG,
   type AppConfig,
 } from '../../../../../core/config/app-config';
+import { ZodValidationPipe } from '../../../../../core/validator/zod-validation.pipe';
 import {
   InvalidAccessTokenError,
   InvalidCurrentPasswordError,
@@ -37,46 +36,6 @@ import {
   requestPassResetSchema,
   type RequestPassResetDto,
 } from '../dto/pass-reset-requests.dto';
-
-function validationError(issues: { message: string }[]): never {
-  throw new UnprocessableEntityException({
-    message: 'Password reset request is invalid.',
-    violations: [...new Set(issues.map((issue) => issue.message))],
-  });
-}
-
-class RequestResetValidationPipe implements PipeTransform<
-  unknown,
-  RequestPassResetDto
-> {
-  transform(value: unknown): RequestPassResetDto {
-    const parsed = requestPassResetSchema.safeParse(value);
-    if (!parsed.success) return validationError(parsed.error.issues);
-    return parsed.data;
-  }
-}
-
-class ConfirmResetValidationPipe implements PipeTransform<
-  unknown,
-  ConfirmPassResetDto
-> {
-  transform(value: unknown): ConfirmPassResetDto {
-    const parsed = confirmPassResetSchema.safeParse(value);
-    if (!parsed.success) return validationError(parsed.error.issues);
-    return parsed.data;
-  }
-}
-
-class AuthenticatedResetValidationPipe implements PipeTransform<
-  unknown,
-  AuthenticatedPassResetDto
-> {
-  transform(value: unknown): AuthenticatedPassResetDto {
-    const parsed = authenticatedPassResetSchema.safeParse(value);
-    if (!parsed.success) return validationError(parsed.error.issues);
-    return parsed.data;
-  }
-}
 
 interface RateWindow {
   count: number;
@@ -96,7 +55,8 @@ export class PassResetController {
   @Post('request')
   @HttpCode(HttpStatus.ACCEPTED)
   async request(
-    @Body(new RequestResetValidationPipe()) input: RequestPassResetDto,
+    @Body(new ZodValidationPipe(requestPassResetSchema))
+    input: RequestPassResetDto,
     @Req() request: Request,
   ): Promise<{ message: string }> {
     this.enforceRateLimit(`email:${request.ip}:${input.email}`, 5, 15 * 60_000);
@@ -116,7 +76,8 @@ export class PassResetController {
   @Post('confirm')
   @HttpCode(HttpStatus.OK)
   async confirm(
-    @Body(new ConfirmResetValidationPipe()) input: ConfirmPassResetDto,
+    @Body(new ZodValidationPipe(confirmPassResetSchema))
+    input: ConfirmPassResetDto,
     @Req() request: Request,
   ): Promise<{ message: string }> {
     this.enforceRateLimit(`token:${request.ip}`, 10, 15 * 60_000);
@@ -134,7 +95,7 @@ export class PassResetController {
   @Post('change')
   @HttpCode(HttpStatus.OK)
   async changeAuthenticated(
-    @Body(new AuthenticatedResetValidationPipe())
+    @Body(new ZodValidationPipe(authenticatedPassResetSchema))
     input: AuthenticatedPassResetDto,
     @Headers('authorization') authorization: string | undefined,
     @Req() request: Request,

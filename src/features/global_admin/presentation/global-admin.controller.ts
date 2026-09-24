@@ -1,5 +1,4 @@
 import {
-  BadRequestException,
   Body,
   Controller,
   Get,
@@ -9,7 +8,7 @@ import {
   Query,
   Req,
 } from '@nestjs/common';
-import { z } from 'zod';
+import { ZodValidationPipe } from '../../../core/validator/zod-validation.pipe';
 import type { ReviewPageOptions } from '../domain/contracts/types';
 import type { GlobalAdminRequest } from './global-admin-auth.middleware';
 import { GlobalAdminUseCases } from '../domain/usecases';
@@ -30,9 +29,9 @@ export class GlobalAdminController {
 
   @Get('pending')
   async getPending(
-    @Query() query: Record<string, unknown>,
+    @Query(new ZodValidationPipe(institutionReviewQuerySchema))
+    options: ReviewPageOptions,
   ): Promise<PendingInstitutionApprovalResponseDto> {
-    const options = this.parseQuery(query);
     const result = await this.useCases.getPending(options);
     return {
       list: result.list.map((row) => ({
@@ -50,10 +49,10 @@ export class GlobalAdminController {
 
   @Get('responded-by-me')
   async getRespondedByMe(
-    @Query() query: Record<string, unknown>,
+    @Query(new ZodValidationPipe(respondedReviewQuerySchema))
+    options: ReviewPageOptions,
     @Req() request: GlobalAdminRequest,
   ): Promise<ApprovedOrRejectedByMeResponseDto> {
-    const options = this.parseQuery(query, respondedReviewQuerySchema);
     const result = await this.useCases.getRespondedBy(
       request.globalAdminUserId,
       options,
@@ -76,36 +75,15 @@ export class GlobalAdminController {
   @Patch(':id/respond')
   async respond(
     @Param('id', new ParseUUIDPipe()) id: string,
-    @Body() body: unknown,
+    @Body(new ZodValidationPipe(approvalResponseSchema))
+    decision: ApprovalResponseInstitutionRequestDto,
     @Req() request: GlobalAdminRequest,
   ): Promise<InstitutionDecisionResponseDto> {
-    const parsed = approvalResponseSchema.safeParse(body);
-    if (!parsed.success) {
-      throw new BadRequestException({
-        message: 'Invalid institution decision.',
-        violations: parsed.error.issues.map((issue) => issue.message),
-      });
-    }
-    const decision: ApprovalResponseInstitutionRequestDto = parsed.data;
     const result = await this.useCases.respond(id, request.globalAdminUserId, {
       verdict: decision.status,
       rejectReason: decision.rejectReason,
       notes: decision.notes,
     });
     return toDecisionResponse(result);
-  }
-
-  private parseQuery(
-    query: Record<string, unknown>,
-    schema: z.ZodType<ReviewPageOptions> = institutionReviewQuerySchema,
-  ): ReviewPageOptions {
-    const parsed = schema.safeParse(query);
-    if (!parsed.success) {
-      throw new BadRequestException({
-        message: 'Invalid pagination or filter query.',
-        violations: parsed.error.issues.map((issue) => issue.message),
-      });
-    }
-    return parsed.data;
   }
 }

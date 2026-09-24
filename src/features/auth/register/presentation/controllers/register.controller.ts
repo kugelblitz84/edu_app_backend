@@ -3,12 +3,12 @@ import {
   ConflictException,
   Controller,
   Headers,
-  PipeTransform,
   Post,
   UnauthorizedException,
   UnprocessableEntityException,
 } from '@nestjs/common';
 import { TokenService } from '../../../../../core/token/token.service';
+import { ZodValidationPipe } from '../../../../../core/validator/zod-validation.pipe';
 import {
   InstitutionRegistrationConflictError,
   RegistrationConflictError,
@@ -32,61 +32,6 @@ import {
   type RegisterUserResponseDto,
 } from '../dto/register-user-response.dto';
 
-const UNSUPPORTED_FIELDS_MESSAGE =
-  'Registration request contains unsupported fields.';
-
-class RegisterUserRequestValidationPipe implements PipeTransform<
-  unknown,
-  RegisterUserRequestDto
-> {
-  transform(value: unknown): RegisterUserRequestDto {
-    const result = registerUserRequestSchema.safeParse(value);
-
-    if (result.success) {
-      return result.data;
-    }
-
-    throw new UnprocessableEntityException({
-      message: 'Registration request is invalid.',
-      violations: [
-        ...new Set(
-          result.error.issues.map((issue) =>
-            issue.code === 'unrecognized_keys'
-              ? UNSUPPORTED_FIELDS_MESSAGE
-              : issue.message,
-          ),
-        ),
-      ],
-    });
-  }
-}
-
-class RegisterInstitutionRequestValidationPipe implements PipeTransform<
-  unknown,
-  RegisterInstitutionRequestDto
-> {
-  transform(value: unknown): RegisterInstitutionRequestDto {
-    const result = registerInstitutionRequestSchema.safeParse(value);
-
-    if (result.success) {
-      return result.data;
-    }
-
-    throw new UnprocessableEntityException({
-      message: 'Registration request is invalid.',
-      violations: [
-        ...new Set(
-          result.error.issues.map((issue) =>
-            issue.code === 'unrecognized_keys'
-              ? UNSUPPORTED_FIELDS_MESSAGE
-              : issue.message,
-          ),
-        ),
-      ],
-    });
-  }
-}
-
 @Controller({ path: 'auth', version: '1' })
 export class RegisterController {
   constructor(
@@ -97,7 +42,7 @@ export class RegisterController {
 
   @Post('register/user')
   async register(
-    @Body(new RegisterUserRequestValidationPipe())
+    @Body(new ZodValidationPipe(registerUserRequestSchema))
     request: RegisterUserRequestDto,
   ): Promise<RegisterUserResponseDto> {
     try {
@@ -122,7 +67,7 @@ export class RegisterController {
 
   @Post('register/institution')
   async registerInstitution(
-    @Body(new RegisterInstitutionRequestValidationPipe())
+    @Body(new ZodValidationPipe(registerInstitutionRequestSchema))
     request: RegisterInstitutionRequestDto,
     @Headers('authorization') authorization?: string,
   ): Promise<RegisterInstitutionResponseDto> {

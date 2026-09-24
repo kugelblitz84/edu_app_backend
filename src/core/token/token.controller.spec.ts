@@ -80,11 +80,11 @@ describe('TokenController', () => {
     const response = await request(app.getHttpServer())
       .post('/api/v1/auth/refresh')
       .send({ refreshToken: '', unsupportedField: true })
-      .expect(422);
+      .expect(400);
 
     const body = response.body as ErrorResponseBody;
     expect(body).toMatchObject({
-      message: 'Refresh token request is invalid.',
+      message: 'Invalid request.',
     });
     expect(body.violations).toContain('Refresh token is required.');
   });

@@ -1,12 +1,5 @@
-// enum ExamStatus {
-//   DRAFT
-//   SCHEDULED
-//   ACTIVE
-//   COMPLETED
-//   CANCELLED
-
-//   @@map("exam_status")
-// }
+// ExamStatus is shared with PersonalExam and is defined in
+// personal.exam.prisma.
 
 model InstitutionExam {
   id              String      @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
@@ -22,7 +15,6 @@ model InstitutionExam {
   createdAt       DateTime    @default(now()) @map("created_at") @db.Timestamptz
   updatedAt       DateTime    @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
   deletedAt       DateTime?   @map("deleted_at") @db.Timestamptz
-  
 
   @@index([institutionId])
   @@index([createdByUserId])

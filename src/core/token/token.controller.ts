@@ -3,12 +3,11 @@ import {
   Controller,
   HttpCode,
   HttpStatus,
-  PipeTransform,
   Post,
   UnauthorizedException,
-  UnprocessableEntityException,
 } from '@nestjs/common';
 import { z } from 'zod';
+import { ZodValidationPipe } from '../validator/zod-validation.pipe';
 import { TokenService } from './token.service';
 
 const refreshTokenRequestSchema = z
@@ -29,26 +28,6 @@ export interface RefreshTokenResponseDto {
   expiresIn: number;
 }
 
-class RefreshTokenRequestValidationPipe implements PipeTransform<
-  unknown,
-  RefreshTokenRequestDto
-> {
-  transform(value: unknown): RefreshTokenRequestDto {
-    const result = refreshTokenRequestSchema.safeParse(value);
-
-    if (result.success) {
-      return result.data;
-    }
-
-    throw new UnprocessableEntityException({
-      message: 'Refresh token request is invalid.',
-      violations: [
-        ...new Set(result.error.issues.map((issue) => issue.message)),
-      ],
-    });
-  }
-}
-
 @Controller({ path: 'auth', version: '1' })
 export class TokenController {
   constructor(private readonly tokenService: TokenService) {}
@@ -56,7 +35,7 @@ export class TokenController {
   @Post('refresh')
   @HttpCode(HttpStatus.OK)
   refresh(
-    @Body(new RefreshTokenRequestValidationPipe())
+    @Body(new ZodValidationPipe(refreshTokenRequestSchema))
     request: RefreshTokenRequestDto,
   ): RefreshTokenResponseDto {
     try {

@@ -278,19 +278,18 @@ describe('Auth module (e2e)', () => {
         password: 'weak',
         unsupportedField: true,
       })
-      .expect(422);
+      .expect(400);
 
     const body = response.body as ErrorResponseBody;
 
     expect(body).toMatchObject({
-      message: 'Registration request is invalid.',
+      message: 'Invalid request.',
     });
     expect(body.violations).toEqual(
       expect.arrayContaining([
         'A valid email address is required.',
         'Username must be 3-30 characters and contain only letters, numbers, and underscores.',
         'Password must be 15-128 characters long.',
-        'Registration request contains unsupported fields.',
       ]),
     );
   });
@@ -303,10 +302,10 @@ describe('Auth module (e2e)', () => {
         password: '',
         unsupportedField: true,
       })
-      .expect(422);
+      .expect(400);
 
     expect(invalidLoginResponse.body as ErrorResponseBody).toMatchObject({
-      message: 'Login request is invalid.',
+      message: 'Invalid request.',
       violations: expect.arrayContaining([
         'Username is required.',
         'Password is required.',

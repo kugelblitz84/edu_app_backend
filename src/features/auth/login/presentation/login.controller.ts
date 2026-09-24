@@ -3,14 +3,13 @@ import {
   Controller,
   ForbiddenException,
   Inject,
-  PipeTransform,
   Post,
   Req,
   UnauthorizedException,
-  UnprocessableEntityException,
 } from '@nestjs/common';
 import type { Request } from 'express';
 import { APP_CONFIG, type AppConfig } from '../../../../core/config/app-config';
+import { ZodValidationPipe } from '../../../../core/validator/zod-validation.pipe';
 import {
   InvalidCredentialsError,
   LoginNotAllowedError,
@@ -23,26 +22,6 @@ import {
   toLoginResponseDto,
 } from './login.dto';
 
-class LoginRequestValidationPipe implements PipeTransform<
-  unknown,
-  LoginRequestDto
-> {
-  transform(value: unknown): LoginRequestDto {
-    const result = loginRequestSchema.safeParse(value);
-
-    if (result.success) {
-      return result.data;
-    }
-
-    throw new UnprocessableEntityException({
-      message: 'Login request is invalid.',
-      violations: [
-        ...new Set(result.error.issues.map((issue) => issue.message)),
-      ],
-    });
-  }
-}
-
 @Controller({ path: 'auth', version: '1' })
 export class LoginController {
   constructor(
@@ -52,7 +31,7 @@ export class LoginController {
 
   @Post('login')
   async login(
-    @Body(new LoginRequestValidationPipe()) request: LoginRequestDto,
+    @Body(new ZodValidationPipe(loginRequestSchema)) request: LoginRequestDto,
     @Req() httpRequest: Request,
   ): Promise<LoginResponseDto> {
     try {
