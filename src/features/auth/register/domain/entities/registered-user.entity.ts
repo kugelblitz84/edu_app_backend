@@ -1,4 +1,4 @@
-export type PlatformRole = 'GUEST' | 'GLOBAL_ADMIN';
+export type PlatformRole = 'USER' | 'GLOBAL_ADMIN';
 export type UserStatus = 'ACTIVE' | 'SUSPENDED' | 'BANNED' | 'DELETED';
 
 export interface RegisteredUser {

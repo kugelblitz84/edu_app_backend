@@ -4,6 +4,7 @@ import type { Server } from 'node:http';
 import request from 'supertest';
 import { Reflector } from '@nestjs/core';
 import { AccessTokenGuard } from '../../core/auth/guards/access-token.guard';
+import { RolesGuard } from '../../core/auth/guards/roles.guard';
 import type { AccessTokenService } from '../../core/auth/services/access-token.service';
 import type { InstitutionReview } from './domain/contracts/types';
 import { InstitutionCodeConflictError } from './domain/contracts/services';
@@ -63,9 +64,25 @@ describe('global-admin endpoints', () => {
         new Reflector(),
         tokenService as unknown as AccessTokenService,
       ),
+      new RolesGuard(new Reflector()),
     );
     await app.init();
     server = app.getHttpServer() as Server;
+  });
+
+  it('forbids authenticated users without the global admin role', async () => {
+    tokenService.verify.mockReturnValueOnce({
+      userId: adminId,
+      platformRole: 'GUEST',
+      issuedAt: new Date(),
+    });
+
+    await request(server)
+      .get('/v1/global-admin/institutions/pending')
+      .set('Authorization', 'Bearer guest-token')
+      .expect(403);
+
+    expect(useCases.getPending).not.toHaveBeenCalled();
   });
 
   afterEach(async () => {

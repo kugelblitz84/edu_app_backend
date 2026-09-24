@@ -1,5 +1,5 @@
 enum PlatformRole {
-  GUEST
+  USER
   GLOBAL_ADMIN
 
   @@map("platform_role")

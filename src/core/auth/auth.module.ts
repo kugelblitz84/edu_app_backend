@@ -16,7 +16,8 @@ import { SessionService } from './services/session.service';
     SessionService,
     RolesGuard,
     { provide: APP_GUARD, useClass: AccessTokenGuard },
+    { provide: APP_GUARD, useExisting: RolesGuard },
   ],
   exports: [AccessTokenService, SessionService, RolesGuard],
 })
-export class GlobalAuthModule {}
+export class AuthModule {}
