@@ -30,7 +30,7 @@ export class PassResetUseCase {
     await this.issueEmailReset(user.id, user.email);
   }
 
-  async confirm(token: string, newPassword: string): Promise<void> {
+  async confirm(token: string, newPassword: string): Promise<string> {
     const reset = await this.repository.findResetByDigest(this.digest(token));
     const now = new Date();
     if (!reset || reset.consumedAt || reset.expiresAt <= now) {
@@ -50,6 +50,7 @@ export class PassResetUseCase {
     );
     if (!consumed) throw new InvalidResetTokenError();
     await this.sendChangedNotice(user.email);
+    return user.id;
   }
 
   async changeAuthenticated(input: {

@@ -16,6 +16,7 @@ import type { Request } from 'express';
 import type { AuthenticatedUser } from '../../../../../core/auth/auth.types';
 import { CurrentUser } from '../../../../../core/auth/decorators/current-user.decorator';
 import { Public } from '../../../../../core/auth/decorators/public.decorator';
+import { SessionService } from '../../../../../core/auth/services/session.service';
 import {
   APP_CONFIG,
   type AppConfig,
@@ -51,6 +52,7 @@ export class PassResetController {
 
   constructor(
     private readonly passReset: PassResetUseCase,
+    private readonly sessions: SessionService,
     @Inject(APP_CONFIG) private readonly config: AppConfig,
   ) {}
 
@@ -86,7 +88,8 @@ export class PassResetController {
   ): Promise<{ message: string }> {
     this.enforceRateLimit(`token:${request.ip}`, 10, 15 * 60_000);
     try {
-      await this.passReset.confirm(input.token, input.newPassword);
+      const userId = await this.passReset.confirm(input.token, input.newPassword);
+      await this.sessions.deleteForUser(userId);
       return { message: 'Password changed successfully.' };
     } catch (error) {
       if (error instanceof InvalidResetTokenError) {
@@ -116,6 +119,9 @@ export class PassResetController {
         ipAddress: request.ip,
         ipRegion: rawRegion ? rawRegion.toUpperCase() : undefined,
       });
+      if (result === 'password_changed') {
+        await this.sessions.deleteForUser(currentUser.userId);
+      }
       return result === 'password_changed'
         ? {
             status: result,

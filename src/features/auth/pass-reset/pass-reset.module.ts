@@ -1,4 +1,5 @@
 import { Module } from '@nestjs/common';
+import { AuthModule } from '../../../core/auth/auth.module';
 import { APP_CONFIG, type AppConfig } from '../../../core/config/app-config';
 import { PrismaModule } from '../../../core/database/prisma.module';
 import { MailModule } from '../../../core/mail/mail.module';
@@ -14,7 +15,7 @@ import { PassResetUseCase } from './domain/use-cases/pass-reset.usecase';
 import { PassResetController } from './presentation/controllers/pass-reset.controller';
 
 @Module({
-  imports: [PrismaModule, MailModule],
+  imports: [AuthModule, PrismaModule, MailModule],
   controllers: [PassResetController],
   providers: [
     { provide: PassResetRepository, useClass: PrismaPassResetRepository },

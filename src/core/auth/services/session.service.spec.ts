@@ -51,8 +51,9 @@ describe(SessionService.name, () => {
       return Promise.resolve({ count: 1 });
     },
   );
+  const deleteMany = jest.fn(() => Promise.resolve({ count: 1 }));
   const prisma = {
-    authSession: { create, findUnique, updateMany },
+    authSession: { create, findUnique, updateMany, deleteMany },
   } as unknown as PrismaService;
   const accessTokens = new AccessTokenService(config);
   const sessions = new SessionService(prisma, accessTokens, config);
@@ -112,5 +113,11 @@ describe(SessionService.name, () => {
       InvalidRefreshTokenError,
     );
     expect(findUnique).not.toHaveBeenCalled();
+  });
+
+  it('deletes every session belonging to a user', async () => {
+    await sessions.deleteForUser(user.userId);
+
+    expect(deleteMany).toHaveBeenCalledWith({ where: { userId: user.userId } });
   });
 });

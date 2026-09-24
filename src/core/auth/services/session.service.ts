@@ -104,6 +104,10 @@ export class SessionService {
     );
   }
 
+  async deleteForUser(userId: string): Promise<void> {
+    await this.prisma.authSession.deleteMany({ where: { userId } });
+  }
+
   private tokensFor(user: SessionUser, refreshToken: string): AuthTokenPair {
     return {
       accessToken: this.accessTokens.generate(user),

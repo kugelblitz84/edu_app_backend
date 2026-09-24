@@ -10,6 +10,8 @@ import {
 import type { Request } from 'express';
 import { z } from 'zod';
 import { ZodValidationPipe } from '../validator/zod-validation.pipe';
+import type { AuthenticatedUser } from './auth.types';
+import { CurrentUser } from './decorators/current-user.decorator';
 import { Public } from './decorators/public.decorator';
 import {
   InvalidRefreshTokenError,
@@ -37,6 +39,12 @@ export interface RefreshTokenResponseDto {
 @Controller({ path: 'auth', version: '1' })
 export class AuthController {
   constructor(private readonly sessions: SessionService) {}
+
+  @Post('logout')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  async logout(@CurrentUser() currentUser: AuthenticatedUser): Promise<void> {
+    await this.sessions.deleteForUser(currentUser.userId);
+  }
 
   @Public()
   @Post('refresh')
