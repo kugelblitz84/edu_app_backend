@@ -35,89 +35,158 @@ const user = {
 };
 
 describe(SessionService.name, () => {
-  const create = jest.fn(
-    (args: {
-      data: { id: string; refreshTokenDigest: string; userAgent?: string };
-      select: { id: boolean };
-    }) => {
-      void args;
-      return Promise.resolve({ id: 'created' });
+  interface CreateSessionArgs {
+    data: {
+      id: string;
+      refreshTokenDigest: string;
+      refreshTokens: { create: { digest: string } };
+      userAgent?: string;
+    };
+  }
+
+  interface ClaimTokenArgs {
+    where: { digest: string; usedAt: null };
+    data: { usedAt: Date };
+  }
+
+  interface UpdateSessionArgs {
+    where: { id: string; refreshTokenDigest?: string };
+    data: { revokedAt?: Date; refreshTokenDigest?: string };
+  }
+
+  const createSession = jest.fn((args: CreateSessionArgs) => {
+    void args;
+    return Promise.resolve({ id: 'created' });
+  });
+  const findRefreshToken = jest.fn();
+  const claimRefreshToken = jest.fn((args: ClaimTokenArgs) => {
+    void args;
+    return Promise.resolve({ count: 1 });
+  });
+  const createRefreshToken = jest.fn(() => Promise.resolve({ digest: 'next' }));
+  const updateSessions = jest.fn((args: UpdateSessionArgs) => {
+    void args;
+    return Promise.resolve({ count: 1 });
+  });
+  const findSession = jest.fn();
+  const deleteSessions = jest.fn(() => Promise.resolve({ count: 1 }));
+  const transactionClient = {
+    authRefreshToken: {
+      updateMany: claimRefreshToken,
+      create: createRefreshToken,
     },
+    authSession: { updateMany: updateSessions },
+  };
+  const runTransaction = jest.fn(
+    (callback: (client: typeof transactionClient) => Promise<unknown>) =>
+      callback(transactionClient),
   );
-  const findUnique = jest.fn();
-  const updateMany = jest.fn(
-    (args: { where: { refreshTokenDigest: string } }) => {
-      void args;
-      return Promise.resolve({ count: 1 });
-    },
-  );
-  const deleteMany = jest.fn(() => Promise.resolve({ count: 1 }));
   const prisma = {
-    authSession: { create, findUnique, updateMany, deleteMany },
+    authSession: {
+      create: createSession,
+      updateMany: updateSessions,
+      findFirst: findSession,
+      deleteMany: deleteSessions,
+    },
+    authRefreshToken: { findUnique: findRefreshToken },
+    $transaction: runTransaction,
   } as unknown as PrismaService;
   const accessTokens = new AccessTokenService(config);
   const sessions = new SessionService(prisma, accessTokens, config);
 
   beforeEach(() => {
     jest.clearAllMocks();
+    claimRefreshToken.mockResolvedValue({ count: 1 });
+    updateSessions.mockResolvedValue({ count: 1 });
   });
 
-  it('creates an opaque refresh token and persists only its SHA-256 digest', async () => {
+  it('creates an opaque refresh token, its history, and a session-bound access token', async () => {
     const result = await sessions.create(user, {
       ipAddress: '127.0.0.1',
       userAgent: 'test-client',
     });
-    const data = create.mock.calls[0][0].data;
+    const data = createSession.mock.calls[0][0].data;
+    const digest = createHash('sha256')
+      .update(result.refreshToken)
+      .digest('hex');
 
     expect(result.refreshToken).toMatch(/^[0-9a-f-]{36}\.[A-Za-z0-9_-]{43}$/i);
     expect(result.refreshToken.startsWith(`${data.id}.`)).toBe(true);
-    expect(data.refreshTokenDigest).toBe(
-      createHash('sha256').update(result.refreshToken).digest('hex'),
-    );
-    expect(data.refreshTokenDigest).not.toContain(result.refreshToken);
+    expect(data.refreshTokenDigest).toBe(digest);
+    expect(data.refreshTokens).toEqual({ create: { digest } });
     expect(data.userAgent).toBe('test-client');
-    expect(accessTokens.verify(result.accessToken).userId).toBe(user.userId);
+
+    const claims = await accessTokens.verify(result.accessToken);
+    expect(claims).toMatchObject({ userId: user.userId, sessionId: data.id });
   });
 
-  it('rotates the refresh secret with a compare-and-update and rejects reuse', async () => {
+  it('rotates once and revokes the token family when an old token is replayed', async () => {
     const original = await sessions.create(user);
     const [sessionId] = original.refreshToken.split('.');
-    findUnique.mockResolvedValue({
-      id: sessionId,
-      expiresAt: new Date(Date.now() + 60_000),
-      revokedAt: null,
-      user: {
-        id: user.userId,
-        platformRole: user.platformRole,
-        status: user.status,
+    const currentDigest = createHash('sha256')
+      .update(original.refreshToken)
+      .digest('hex');
+    const stored = {
+      usedAt: null as Date | null,
+      session: {
+        id: sessionId,
+        refreshTokenDigest: currentDigest,
+        expiresAt: new Date(Date.now() + 60_000),
+        revokedAt: null,
+        user: {
+          id: user.userId,
+          platformRole: user.platformRole,
+          status: user.status,
+        },
       },
-    });
-    updateMany
-      .mockResolvedValueOnce({ count: 1 })
-      .mockResolvedValueOnce({ count: 0 });
+    };
+    findRefreshToken.mockImplementation(() => Promise.resolve(stored));
 
     const rotated = await sessions.rotate(original.refreshToken);
     expect(rotated.refreshToken).not.toBe(original.refreshToken);
     expect(rotated.refreshToken.startsWith(`${sessionId}.`)).toBe(true);
-    expect(updateMany.mock.calls[0][0].where.refreshTokenDigest).toBe(
-      createHash('sha256').update(original.refreshToken).digest('hex'),
-    );
+    const claim = claimRefreshToken.mock.calls[0][0];
+    expect(claim.where).toEqual({ digest: currentDigest, usedAt: null });
+    expect(claim.data.usedAt).toBeInstanceOf(Date);
 
+    stored.usedAt = new Date();
     await expect(sessions.rotate(original.refreshToken)).rejects.toBeInstanceOf(
       InvalidRefreshTokenError,
     );
+    const revocation = updateSessions.mock.lastCall?.[0];
+    expect(revocation?.where).toEqual({ id: sessionId });
+    expect(revocation?.data.revokedAt).toBeInstanceOf(Date);
   });
 
   it('rejects malformed refresh tokens before querying storage', async () => {
     await expect(sessions.rotate('not-a-refresh-token')).rejects.toBeInstanceOf(
       InvalidRefreshTokenError,
     );
-    expect(findUnique).not.toHaveBeenCalled();
+    expect(findRefreshToken).not.toHaveBeenCalled();
+  });
+
+  it('uses current database role and status for access authentication', async () => {
+    findSession.mockResolvedValue({ user: { platformRole: 'GLOBAL_ADMIN' } });
+    const issuedAt = new Date();
+    await expect(
+      sessions.authenticateAccessToken({
+        userId: user.userId,
+        sessionId: 'session-id',
+        platformRole: 'PLATFORM_USER',
+        issuedAt,
+      }),
+    ).resolves.toEqual({
+      userId: user.userId,
+      sessionId: 'session-id',
+      platformRole: 'GLOBAL_ADMIN',
+      issuedAt,
+    });
   });
 
   it('deletes every session belonging to a user', async () => {
     await sessions.deleteForUser(user.userId);
-
-    expect(deleteMany).toHaveBeenCalledWith({ where: { userId: user.userId } });
+    expect(deleteSessions).toHaveBeenCalledWith({
+      where: { userId: user.userId },
+    });
   });
 });

@@ -3,7 +3,6 @@ import {
   Body,
   Controller,
   HttpCode,
-  HttpException,
   HttpStatus,
   Inject,
   Logger,
@@ -11,12 +10,12 @@ import {
   Req,
   UnauthorizedException,
 } from '@nestjs/common';
-import { createHash } from 'node:crypto';
 import type { Request } from 'express';
 import type { AuthenticatedUser } from '../../../../../core/auth/auth.types';
 import { CurrentUser } from '../../../../../core/auth/decorators/current-user.decorator';
 import { Public } from '../../../../../core/auth/decorators/public.decorator';
 import { SessionService } from '../../../../../core/auth/services/session.service';
+import { RateLimitService } from '../../../../../core/auth/services/rate-limit.service';
 import {
   APP_CONFIG,
   type AppConfig,
@@ -40,19 +39,14 @@ import {
   type RequestPassResetDto,
 } from '../dto/pass-reset-requests.dto';
 
-interface RateWindow {
-  count: number;
-  resetsAt: number;
-}
-
 @Controller({ path: 'auth/password-reset', version: '1' })
 export class PassResetController {
   private readonly logger = new Logger(PassResetController.name);
-  private readonly attempts = new Map<string, RateWindow>();
 
   constructor(
     private readonly passReset: PassResetUseCase,
     private readonly sessions: SessionService,
+    private readonly rateLimits: RateLimitService,
     @Inject(APP_CONFIG) private readonly config: AppConfig,
   ) {}
 
@@ -64,7 +58,13 @@ export class PassResetController {
     input: RequestPassResetDto,
     @Req() request: Request,
   ): Promise<{ message: string }> {
-    this.enforceRateLimit(`email:${request.ip}:${input.email}`, 5, 15 * 60_000);
+    await this.rateLimits.enforce(
+      'password-reset-request',
+      `${request.ip ?? 'unknown'}:${input.email.trim().toLowerCase()}`,
+      5,
+      15 * 60_000,
+      'Too many password reset attempts. Please try again later.',
+    );
     const startedAt = Date.now();
     try {
       await this.passReset.requestByEmail(input.email);
@@ -86,9 +86,18 @@ export class PassResetController {
     input: ConfirmPassResetDto,
     @Req() request: Request,
   ): Promise<{ message: string }> {
-    this.enforceRateLimit(`token:${request.ip}`, 10, 15 * 60_000);
+    await this.rateLimits.enforce(
+      'password-reset-confirm',
+      request.ip ?? 'unknown',
+      10,
+      15 * 60_000,
+      'Too many password reset attempts. Please try again later.',
+    );
     try {
-      const userId = await this.passReset.confirm(input.token, input.newPassword);
+      const userId = await this.passReset.confirm(
+        input.token,
+        input.newPassword,
+      );
       await this.sessions.deleteForUser(userId);
       return { message: 'Password changed successfully.' };
     } catch (error) {
@@ -107,7 +116,13 @@ export class PassResetController {
     @CurrentUser() currentUser: AuthenticatedUser,
     @Req() request: Request,
   ): Promise<{ status: string; message: string }> {
-    this.enforceRateLimit(`change:${request.ip}`, 5, 15 * 60_000);
+    await this.rateLimits.enforce(
+      'password-reset-change',
+      request.ip ?? 'unknown',
+      5,
+      15 * 60_000,
+      'Too many password reset attempts. Please try again later.',
+    );
     const rawRegion = request.get(this.config.auth.ipRegionHeader)?.trim();
 
     try {
@@ -140,33 +155,6 @@ export class PassResetController {
         throw new UnauthorizedException(error.message);
       }
       throw error;
-    }
-  }
-
-  private enforceRateLimit(
-    rawKey: string,
-    limit: number,
-    windowMilliseconds: number,
-  ): void {
-    const key = createHash('sha256').update(rawKey).digest('hex');
-    const now = Date.now();
-    const current = this.attempts.get(key);
-    if (!current || current.resetsAt <= now) {
-      if (!current && this.attempts.size >= 10_000) {
-        throw new HttpException(
-          'Too many password reset attempts. Please try again later.',
-          HttpStatus.TOO_MANY_REQUESTS,
-        );
-      }
-      this.attempts.set(key, { count: 1, resetsAt: now + windowMilliseconds });
-      return;
-    }
-    current.count += 1;
-    if (current.count > limit) {
-      throw new HttpException(
-        'Too many password reset attempts. Please try again later.',
-        HttpStatus.TOO_MANY_REQUESTS,
-      );
     }
   }
 

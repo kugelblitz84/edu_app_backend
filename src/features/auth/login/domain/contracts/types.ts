@@ -1,7 +1,7 @@
 import type {
   PlatformRole,
   UserStatus,
-} from '../../../register/domain/entities/registered-user.entity';
+} from '../../../../../core/auth/domain/identity.types';
 
 export interface LoginUserRecord {
   id: string;

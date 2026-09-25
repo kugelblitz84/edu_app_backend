@@ -3,6 +3,7 @@ import { createHash, randomBytes, randomUUID } from 'node:crypto';
 import { APP_CONFIG, type AppConfig } from '../../config/app-config';
 import { PrismaService } from '../../database/prisma.service';
 import type {
+  AuthenticatedUser,
   AuthTokenPair,
   SessionMetadata,
   SessionUser,
@@ -29,11 +30,14 @@ export class SessionService {
   ): Promise<AuthTokenPair> {
     const sessionId = randomUUID();
     const refreshToken = this.generateRefreshToken(sessionId);
+    const refreshTokenDigest = this.digest(refreshToken);
+
     await this.prisma.authSession.create({
       data: {
         id: sessionId,
         userId: user.userId,
-        refreshTokenDigest: this.digest(refreshToken),
+        refreshTokenDigest,
+        refreshTokens: { create: { digest: refreshTokenDigest } },
         expiresAt: new Date(
           Date.now() + this.config.auth.refreshTokenTtlSeconds * 1000,
         ),
@@ -43,7 +47,7 @@ export class SessionService {
       select: { id: true },
     });
 
-    return this.tokensFor(user, refreshToken);
+    return this.tokensFor(user, sessionId, refreshToken);
   }
 
   async rotate(
@@ -52,22 +56,36 @@ export class SessionService {
   ): Promise<AuthTokenPair> {
     const sessionId = this.readSessionId(refreshToken);
     const currentDigest = this.digest(refreshToken);
-    const session = await this.prisma.authSession.findUnique({
-      where: { refreshTokenDigest: currentDigest },
+    const token = await this.prisma.authRefreshToken.findUnique({
+      where: { digest: currentDigest },
       select: {
-        id: true,
-        expiresAt: true,
-        revokedAt: true,
-        user: {
-          select: { id: true, platformRole: true, status: true },
+        usedAt: true,
+        session: {
+          select: {
+            id: true,
+            refreshTokenDigest: true,
+            expiresAt: true,
+            revokedAt: true,
+            user: {
+              select: { id: true, platformRole: true, status: true },
+            },
+          },
         },
       },
     });
     const now = new Date();
 
+    if (!token || token.session.id !== sessionId) {
+      throw new InvalidRefreshTokenError();
+    }
+
+    if (token.usedAt !== null) {
+      await this.revoke(sessionId);
+      throw new InvalidRefreshTokenError();
+    }
+
+    const session = token.session;
     if (
-      !session ||
-      session.id !== sessionId ||
       session.revokedAt !== null ||
       session.expiresAt <= now ||
       session.user.status !== 'ACTIVE'
@@ -76,23 +94,42 @@ export class SessionService {
     }
 
     const nextRefreshToken = this.generateRefreshToken(session.id);
-    const rotation = await this.prisma.authSession.updateMany({
-      where: {
-        id: session.id,
-        refreshTokenDigest: currentDigest,
-        revokedAt: null,
-        expiresAt: { gt: now },
-      },
-      data: {
-        refreshTokenDigest: this.digest(nextRefreshToken),
-        rotatedAt: now,
-        lastSeenAt: now,
-        ipAddress: this.ipAddress(metadata.ipAddress),
-        userAgent: this.userAgent(metadata.userAgent),
-      },
+    const nextDigest = this.digest(nextRefreshToken);
+    const rotated = await this.prisma.$transaction(async (transaction) => {
+      const claimed = await transaction.authRefreshToken.updateMany({
+        where: { digest: currentDigest, usedAt: null },
+        data: { usedAt: now },
+      });
+      if (claimed.count !== 1) return false;
+
+      const updated = await transaction.authSession.updateMany({
+        where: {
+          id: session.id,
+          refreshTokenDigest: currentDigest,
+          revokedAt: null,
+          expiresAt: { gt: now },
+        },
+        data: {
+          refreshTokenDigest: nextDigest,
+          rotatedAt: now,
+          lastSeenAt: now,
+          ipAddress: this.ipAddress(metadata.ipAddress),
+          userAgent: this.userAgent(metadata.userAgent),
+        },
+      });
+      if (updated.count !== 1) return false;
+
+      await transaction.authRefreshToken.create({
+        data: { digest: nextDigest, sessionId: session.id },
+        select: { digest: true },
+      });
+      return true;
     });
 
-    if (rotation.count !== 1) throw new InvalidRefreshTokenError();
+    if (!rotated) {
+      await this.revoke(session.id);
+      throw new InvalidRefreshTokenError();
+    }
 
     return this.tokensFor(
       {
@@ -100,17 +137,47 @@ export class SessionService {
         platformRole: session.user.platformRole,
         status: session.user.status,
       },
+      session.id,
       nextRefreshToken,
     );
+  }
+
+  async authenticateAccessToken(
+    claims: AuthenticatedUser,
+  ): Promise<AuthenticatedUser | null> {
+    const session = await this.prisma.authSession.findFirst({
+      where: {
+        id: claims.sessionId,
+        userId: claims.userId,
+        revokedAt: null,
+        expiresAt: { gt: new Date() },
+        user: { status: 'ACTIVE' },
+      },
+      select: { user: { select: { platformRole: true } } },
+    });
+
+    if (!session) return null;
+    return { ...claims, platformRole: session.user.platformRole };
+  }
+
+  async revoke(sessionId: string, userId?: string): Promise<void> {
+    await this.prisma.authSession.updateMany({
+      where: { id: sessionId, ...(userId ? { userId } : {}) },
+      data: { revokedAt: new Date() },
+    });
   }
 
   async deleteForUser(userId: string): Promise<void> {
     await this.prisma.authSession.deleteMany({ where: { userId } });
   }
 
-  private tokensFor(user: SessionUser, refreshToken: string): AuthTokenPair {
+  private async tokensFor(
+    user: SessionUser,
+    sessionId: string,
+    refreshToken: string,
+  ): Promise<AuthTokenPair> {
     return {
-      accessToken: this.accessTokens.generate(user),
+      accessToken: await this.accessTokens.generate(user, sessionId),
       refreshToken,
       accessTokenExpiresIn: this.accessTokens.expiresIn,
     };

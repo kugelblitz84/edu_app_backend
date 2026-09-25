@@ -9,15 +9,17 @@ import type { Request } from 'express';
 import type { AuthenticatedRequest } from '../auth.types';
 import { IS_PUBLIC_KEY } from '../decorators/public.decorator';
 import { AccessTokenService } from '../services/access-token.service';
+import { SessionService } from '../services/session.service';
 
 @Injectable()
 export class AccessTokenGuard implements CanActivate {
   constructor(
     private readonly reflector: Reflector,
     private readonly accessTokens: AccessTokenService,
+    private readonly sessions: SessionService,
   ) {}
 
-  canActivate(context: ExecutionContext): boolean {
+  async canActivate(context: ExecutionContext): Promise<boolean> {
     const isPublic = this.reflector.getAllAndOverride<boolean>(IS_PUBLIC_KEY, [
       context.getHandler(),
       context.getClass(),
@@ -31,9 +33,10 @@ export class AccessTokenGuard implements CanActivate {
     }
 
     try {
-      (request as AuthenticatedRequest).user = this.accessTokens.verify(
-        match[1],
-      );
+      const claims = await this.accessTokens.verify(match[1]);
+      const user = await this.sessions.authenticateAccessToken(claims);
+      if (!user) throw new Error('Inactive session');
+      (request as AuthenticatedRequest).user = user;
       return true;
     } catch {
       throw new UnauthorizedException('A valid access token is required.');

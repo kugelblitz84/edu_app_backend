@@ -17,6 +17,7 @@ import {
   InvalidRefreshTokenError,
   SessionService,
 } from './services/session.service';
+import { RateLimitService } from './services/rate-limit.service';
 
 const refreshTokenRequestSchema = z
   .object({
@@ -38,12 +39,15 @@ export interface RefreshTokenResponseDto {
 
 @Controller({ path: 'auth', version: '1' })
 export class AuthController {
-  constructor(private readonly sessions: SessionService) {}
+  constructor(
+    private readonly sessions: SessionService,
+    private readonly rateLimits: RateLimitService,
+  ) {}
 
   @Post('logout')
   @HttpCode(HttpStatus.NO_CONTENT)
   async logout(@CurrentUser() currentUser: AuthenticatedUser): Promise<void> {
-    await this.sessions.deleteForUser(currentUser.userId);
+    await this.sessions.revoke(currentUser.sessionId, currentUser.userId);
   }
 
   @Public()
@@ -54,6 +58,13 @@ export class AuthController {
     input: RefreshTokenRequestDto,
     @Req() request: Request,
   ): Promise<RefreshTokenResponseDto> {
+    await this.rateLimits.enforce(
+      'auth-refresh-ip',
+      request.ip ?? 'unknown',
+      30,
+      15 * 60_000,
+      'Too many refresh attempts. Please try again later.',
+    );
     try {
       const tokens = await this.sessions.rotate(input.refreshToken, {
         ipAddress: request.ip,

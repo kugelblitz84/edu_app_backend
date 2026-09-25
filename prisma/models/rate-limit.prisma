@@ -1,0 +1,8 @@
+model RateLimitBucket {
+  key      String   @id @db.VarChar(64)
+  count    Int
+  resetsAt DateTime @map("resets_at") @db.Timestamptz
+
+  @@index([resetsAt])
+  @@map("rate_limit_buckets")
+}

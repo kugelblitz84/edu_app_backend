@@ -1,4 +1,4 @@
-import type { UserStatus } from '../../../register/domain/entities/registered-user.entity';
+import type { UserStatus } from '../../../../../core/auth/domain/identity.types';
 
 export interface PasswordResetUser {
   id: string;

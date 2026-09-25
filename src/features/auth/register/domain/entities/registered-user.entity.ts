@@ -1,5 +1,12 @@
-export type PlatformRole = 'PLATFORM_USER' | 'GLOBAL_ADMIN';
-export type UserStatus = 'ACTIVE' | 'SUSPENDED' | 'BANNED' | 'DELETED';
+import type {
+  PlatformRole,
+  UserStatus,
+} from '../../../../../core/auth/domain/identity.types';
+
+export type {
+  PlatformRole,
+  UserStatus,
+} from '../../../../../core/auth/domain/identity.types';
 
 export interface RegisteredUser {
   id: string;

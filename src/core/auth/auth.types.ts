@@ -1,8 +1,5 @@
 import type { Request } from 'express';
-import type {
-  PlatformRole,
-  UserStatus,
-} from '../../features/auth/register/domain/entities/registered-user.entity';
+import type { PlatformRole, UserStatus } from './domain/identity.types';
 
 export interface AccessTokenSubject {
   userId: string;
@@ -10,6 +7,7 @@ export interface AccessTokenSubject {
 }
 
 export interface AuthenticatedUser extends AccessTokenSubject {
+  sessionId: string;
   issuedAt: Date;
 }
 
@@ -34,6 +32,7 @@ export interface AuthTokenPair {
 
 export interface AccessTokenPayload {
   sub?: unknown;
+  sid?: unknown;
   role?: unknown;
   iat?: unknown;
   exp?: unknown;

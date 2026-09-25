@@ -1,5 +1,6 @@
 import { Inject, Injectable } from '@nestjs/common';
-import { createHmac, randomUUID, timingSafeEqual } from 'node:crypto';
+import { randomUUID } from 'node:crypto';
+import { jwtVerify, SignJWT } from 'jose';
 import { APP_CONFIG, type AppConfig } from '../../config/app-config';
 import type {
   AccessTokenPayload,
@@ -11,77 +12,58 @@ import type {
 export class AccessTokenService {
   constructor(@Inject(APP_CONFIG) private readonly config: AppConfig) {}
 
-  generate(subject: AccessTokenSubject): string {
+  async generate(
+    subject: AccessTokenSubject,
+    sessionId: string,
+  ): Promise<string> {
     const issuedAt = Math.floor(Date.now() / 1000);
-    const payload = {
-      sub: subject.userId,
+
+    return new SignJWT({
       role: subject.platformRole,
       tokenType: 'access',
-      iss: this.config.auth.issuer,
-      aud: 'edu-app-api',
-      iat: issuedAt,
-      exp: issuedAt + this.config.auth.accessTokenTtlSeconds,
-      jti: randomUUID(),
-    };
-    const header = this.encode({ alg: 'HS256', typ: 'JWT' });
-    const body = this.encode(payload);
-    const signature = createHmac('sha256', this.config.auth.accessTokenSecret)
-      .update(`${header}.${body}`)
-      .digest('base64url');
-
-    return `${header}.${body}.${signature}`;
+      sid: sessionId,
+    })
+      .setProtectedHeader({ alg: 'HS256', typ: 'JWT' })
+      .setSubject(subject.userId)
+      .setIssuer(this.config.auth.issuer)
+      .setAudience('edu-app-api')
+      .setIssuedAt(issuedAt)
+      .setExpirationTime(issuedAt + this.config.auth.accessTokenTtlSeconds)
+      .setJti(randomUUID())
+      .sign(this.signingKey());
   }
 
-  verify(token: string): AuthenticatedUser {
+  async verify(token: string): Promise<AuthenticatedUser> {
     if (token.length > 4096) throw new Error('Invalid access token');
-    const parts = token.split('.');
-    if (parts.length !== 3) throw new Error('Invalid access token');
-    const [encodedHeader, encodedPayload, suppliedSignature] = parts;
-    const header = this.decode(encodedHeader) as {
-      alg?: unknown;
-      typ?: unknown;
-    };
 
-    if (header.alg !== 'HS256' || header.typ !== 'JWT') {
-      throw new Error('Invalid access token');
-    }
-
-    const expectedSignature = createHmac(
-      'sha256',
-      this.config.auth.accessTokenSecret,
-    )
-      .update(`${encodedHeader}.${encodedPayload}`)
-      .digest();
-    const supplied = Buffer.from(suppliedSignature, 'base64url');
-    if (
-      supplied.length !== expectedSignature.length ||
-      !timingSafeEqual(supplied, expectedSignature)
-    ) {
-      throw new Error('Invalid access token');
-    }
-
-    const payload = this.decode(encodedPayload) as AccessTokenPayload;
+    const { payload } = await jwtVerify(token, this.signingKey(), {
+      algorithms: ['HS256'],
+      issuer: this.config.auth.issuer,
+      audience: 'edu-app-api',
+      typ: 'JWT',
+    });
+    const claims = payload as AccessTokenPayload;
     const now = Math.floor(Date.now() / 1000);
+
     if (
-      typeof payload.sub !== 'string' ||
-      typeof payload.iat !== 'number' ||
-      typeof payload.exp !== 'number' ||
-      !Number.isSafeInteger(payload.iat) ||
-      !Number.isSafeInteger(payload.exp) ||
-      payload.iat > now + 60 ||
-      payload.exp <= now ||
-      payload.iss !== this.config.auth.issuer ||
-      payload.aud !== 'edu-app-api' ||
-      payload.tokenType !== 'access' ||
-      (payload.role !== 'PLATFORM_USER' && payload.role !== 'GLOBAL_ADMIN')
+      typeof claims.sub !== 'string' ||
+      typeof claims.sid !== 'string' ||
+      typeof claims.iat !== 'number' ||
+      typeof claims.exp !== 'number' ||
+      !Number.isSafeInteger(claims.iat) ||
+      !Number.isSafeInteger(claims.exp) ||
+      claims.iat > now + 60 ||
+      claims.tokenType !== 'access' ||
+      (claims.role !== 'PLATFORM_USER' && claims.role !== 'GLOBAL_ADMIN')
     ) {
       throw new Error('Invalid access token');
     }
 
     return {
-      userId: payload.sub,
-      platformRole: payload.role,
-      issuedAt: new Date(payload.iat * 1000),
+      userId: claims.sub,
+      sessionId: claims.sid,
+      platformRole: claims.role,
+      issuedAt: new Date(claims.iat * 1000),
     };
   }
 
@@ -89,13 +71,7 @@ export class AccessTokenService {
     return this.config.auth.accessTokenTtlSeconds;
   }
 
-  private encode(value: object): string {
-    return Buffer.from(JSON.stringify(value), 'utf8').toString('base64url');
-  }
-
-  private decode(value: string): unknown {
-    return JSON.parse(
-      Buffer.from(value, 'base64url').toString('utf8'),
-    ) as unknown;
+  private signingKey(): Uint8Array {
+    return new TextEncoder().encode(this.config.auth.accessTokenSecret);
   }
 }

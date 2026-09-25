@@ -6,6 +6,7 @@ import { Reflector } from '@nestjs/core';
 import { AccessTokenGuard } from '../../core/auth/guards/access-token.guard';
 import { RolesGuard } from '../../core/auth/guards/roles.guard';
 import type { AccessTokenService } from '../../core/auth/services/access-token.service';
+import type { SessionService } from '../../core/auth/services/session.service';
 import type { InstitutionReview } from './domain/contracts/types';
 import { InstitutionCodeConflictError } from './domain/contracts/services';
 import { GlobalAdminUseCases } from './domain/usecases';
@@ -43,14 +44,22 @@ describe('global-admin endpoints', () => {
   const tokenService = {
     verify: jest.fn(),
   };
+  const sessionService = {
+    authenticateAccessToken: jest.fn(),
+  };
 
   beforeEach(async () => {
     jest.clearAllMocks();
-    tokenService.verify.mockReturnValue({
+    const admin = {
       userId: adminId,
+      sessionId: 'admin-session-id',
       platformRole: 'GLOBAL_ADMIN',
       issuedAt: new Date(),
-    });
+    } as const;
+    tokenService.verify.mockResolvedValue(admin);
+    sessionService.authenticateAccessToken.mockImplementation((user) =>
+      Promise.resolve(user),
+    );
 
     const module = await Test.createTestingModule({
       controllers: [GlobalAdminController],
@@ -63,6 +72,7 @@ describe('global-admin endpoints', () => {
       new AccessTokenGuard(
         new Reflector(),
         tokenService as unknown as AccessTokenService,
+        sessionService as unknown as SessionService,
       ),
       new RolesGuard(new Reflector()),
     );
@@ -71,8 +81,9 @@ describe('global-admin endpoints', () => {
   });
 
   it('forbids authenticated users without the global admin role', async () => {
-    tokenService.verify.mockReturnValueOnce({
+    tokenService.verify.mockResolvedValueOnce({
       userId: adminId,
+      sessionId: 'user-session-id',
       platformRole: 'PLATFORM_USER',
       issuedAt: new Date(),
     });
