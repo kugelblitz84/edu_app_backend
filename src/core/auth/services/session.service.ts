@@ -204,6 +204,18 @@ export class SessionService {
     if (revoked.count > 0) this.invalidateSession(sessionId);
   }
 
+  /**
+   * Call after changing a user's status or platform role so no session can
+   * continue with authorization data issued before the change.
+   */
+  async revokeForUser(userId: string): Promise<void> {
+    await this.prisma.authSession.updateMany({
+      where: { userId, revokedAt: null },
+      data: { revokedAt: new Date() },
+    });
+    this.invalidateUserSessions(userId);
+  }
+
   async deleteForUser(userId: string): Promise<void> {
     await this.prisma.authSession.deleteMany({ where: { userId } });
     this.invalidateUserSessions(userId);

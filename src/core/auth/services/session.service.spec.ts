@@ -50,7 +50,12 @@ describe(SessionService.name, () => {
   }
 
   interface UpdateSessionArgs {
-    where: { id: string; refreshTokenDigest?: string };
+    where: {
+      id?: string;
+      userId?: string;
+      revokedAt?: null;
+      refreshTokenDigest?: string;
+    };
     data: { revokedAt?: Date; refreshTokenDigest?: string };
   }
 
@@ -263,6 +268,37 @@ describe(SessionService.name, () => {
     await sessions.rotate(original.refreshToken);
     await sessions.authenticateAccessToken(claims);
 
+    expect(findSession).toHaveBeenCalledTimes(2);
+  });
+
+  it('revokes and clears every cached session after a user role or status change', async () => {
+    findSession
+      .mockResolvedValueOnce({
+        expiresAt: new Date(Date.now() + 60_000),
+        user: { platformRole: 'PLATFORM_USER' },
+      })
+      .mockResolvedValueOnce(null);
+    const claims = {
+      userId: user.userId,
+      sessionId: 'authorization-change-session-id',
+      platformRole: user.platformRole,
+      issuedAt: new Date(),
+    };
+    await sessions.authenticateAccessToken(claims);
+
+    await sessions.revokeForUser(user.userId);
+
+    const revocation = updateSessions.mock.lastCall?.[0];
+    expect(revocation?.where).toEqual({
+      userId: user.userId,
+      revokedAt: null,
+    });
+    expect(revocation?.data.revokedAt).toBeInstanceOf(Date);
+    expect(updateSessions).toHaveBeenCalledWith({
+      where: { userId: user.userId, revokedAt: null },
+      data: { revokedAt: revocation?.data.revokedAt },
+    });
+    await expect(sessions.authenticateAccessToken(claims)).resolves.toBeNull();
     expect(findSession).toHaveBeenCalledTimes(2);
   });
 
