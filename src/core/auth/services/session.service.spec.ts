@@ -91,13 +91,15 @@ describe(SessionService.name, () => {
     authRefreshToken: { findUnique: findRefreshToken },
     $transaction: runTransaction,
   } as unknown as PrismaService;
-  const accessTokens = new AccessTokenService(config);
-  const sessions = new SessionService(prisma, accessTokens, config);
+  let accessTokens: AccessTokenService;
+  let sessions: SessionService;
 
   beforeEach(() => {
     jest.clearAllMocks();
     claimRefreshToken.mockResolvedValue({ count: 1 });
     updateSessions.mockResolvedValue({ count: 1 });
+    accessTokens = new AccessTokenService(config);
+    sessions = new SessionService(prisma, accessTokens, config);
   });
 
   it('creates an opaque refresh token, its history, and a session-bound access token', async () => {
@@ -166,7 +168,10 @@ describe(SessionService.name, () => {
   });
 
   it('uses current database role and status for access authentication', async () => {
-    findSession.mockResolvedValue({ user: { platformRole: 'GLOBAL_ADMIN' } });
+    findSession.mockResolvedValue({
+      expiresAt: new Date(Date.now() + 60_000),
+      user: { platformRole: 'GLOBAL_ADMIN' },
+    });
     const issuedAt = new Date();
     await expect(
       sessions.authenticateAccessToken({
@@ -183,10 +188,103 @@ describe(SessionService.name, () => {
     });
   });
 
+  it('caches an active session lookup', async () => {
+    findSession.mockResolvedValue({
+      expiresAt: new Date(Date.now() + 60_000),
+      user: { platformRole: 'PLATFORM_USER' },
+    });
+    const claims = {
+      userId: user.userId,
+      sessionId: 'cached-session-id',
+      platformRole: user.platformRole,
+      issuedAt: new Date(),
+    };
+
+    await sessions.authenticateAccessToken(claims);
+    await sessions.authenticateAccessToken(claims);
+
+    expect(findSession).toHaveBeenCalledTimes(1);
+  });
+
+  it('clears a cached session after revocation', async () => {
+    findSession
+      .mockResolvedValueOnce({
+        expiresAt: new Date(Date.now() + 60_000),
+        user: { platformRole: 'PLATFORM_USER' },
+      })
+      .mockResolvedValueOnce(null);
+    const claims = {
+      userId: user.userId,
+      sessionId: 'revoked-session-id',
+      platformRole: user.platformRole,
+      issuedAt: new Date(),
+    };
+
+    await sessions.authenticateAccessToken(claims);
+    await sessions.revoke(claims.sessionId, claims.userId);
+
+    await expect(sessions.authenticateAccessToken(claims)).resolves.toBeNull();
+    expect(findSession).toHaveBeenCalledTimes(2);
+  });
+
+  it('clears a cached session after refresh rotation', async () => {
+    const original = await sessions.create(user);
+    const [sessionId] = original.refreshToken.split('.');
+    const currentDigest = createHash('sha256')
+      .update(original.refreshToken)
+      .digest('hex');
+    const expiresAt = new Date(Date.now() + 60_000);
+    const claims = {
+      userId: user.userId,
+      sessionId,
+      platformRole: user.platformRole,
+      issuedAt: new Date(),
+    };
+    findSession.mockResolvedValue({
+      expiresAt,
+      user: { platformRole: user.platformRole },
+    });
+    findRefreshToken.mockResolvedValue({
+      usedAt: null,
+      session: {
+        id: sessionId,
+        refreshTokenDigest: currentDigest,
+        expiresAt,
+        revokedAt: null,
+        user: {
+          id: user.userId,
+          platformRole: user.platformRole,
+          status: user.status,
+        },
+      },
+    });
+
+    await sessions.authenticateAccessToken(claims);
+    await sessions.rotate(original.refreshToken);
+    await sessions.authenticateAccessToken(claims);
+
+    expect(findSession).toHaveBeenCalledTimes(2);
+  });
+
   it('deletes every session belonging to a user', async () => {
+    findSession.mockResolvedValue({
+      expiresAt: new Date(Date.now() + 60_000),
+      user: { platformRole: 'PLATFORM_USER' },
+    });
+    const claims = {
+      userId: user.userId,
+      sessionId: 'password-change-session-id',
+      platformRole: user.platformRole,
+      issuedAt: new Date(),
+    };
+    await sessions.authenticateAccessToken(claims);
+
     await sessions.deleteForUser(user.userId);
     expect(deleteSessions).toHaveBeenCalledWith({
       where: { userId: user.userId },
     });
+
+    await sessions.authenticateAccessToken(claims);
+    expect(findSession).toHaveBeenCalledTimes(2);
   });
 });

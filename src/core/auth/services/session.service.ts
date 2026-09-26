@@ -16,8 +16,19 @@ export class InvalidRefreshTokenError extends Error {
   }
 }
 
+interface CachedSession {
+  userId: string;
+  platformRole: SessionUser['platformRole'];
+  expiresAt: number;
+}
+
+const MAX_CACHED_SESSIONS = 10_000;
+
 @Injectable()
 export class SessionService {
+  private readonly sessionCache = new Map<string, CachedSession>();
+  private cacheEpoch = 0;
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly accessTokens: AccessTokenService,
@@ -90,6 +101,7 @@ export class SessionService {
       session.expiresAt <= now ||
       session.user.status !== 'ACTIVE'
     ) {
+      this.invalidateSession(session.id);
       throw new InvalidRefreshTokenError();
     }
 
@@ -131,6 +143,7 @@ export class SessionService {
       throw new InvalidRefreshTokenError();
     }
 
+    this.invalidateSession(session.id);
     return this.tokensFor(
       {
         userId: session.user.id,
@@ -145,30 +158,77 @@ export class SessionService {
   async authenticateAccessToken(
     claims: AuthenticatedUser,
   ): Promise<AuthenticatedUser | null> {
+    const cached = this.sessionCache.get(claims.sessionId);
+    const now = Date.now();
+    if (cached) {
+      if (cached.userId === claims.userId && cached.expiresAt > now) {
+        return { ...claims, platformRole: cached.platformRole };
+      }
+      this.sessionCache.delete(claims.sessionId);
+    }
+
+    const cacheEpoch = this.cacheEpoch;
     const session = await this.prisma.authSession.findFirst({
       where: {
         id: claims.sessionId,
         userId: claims.userId,
         revokedAt: null,
-        expiresAt: { gt: new Date() },
+        expiresAt: { gt: new Date(now) },
         user: { status: 'ACTIVE' },
       },
-      select: { user: { select: { platformRole: true } } },
+      select: {
+        expiresAt: true,
+        user: { select: { platformRole: true } },
+      },
     });
 
     if (!session) return null;
+    if (cacheEpoch === this.cacheEpoch) {
+      this.cacheSession(claims.sessionId, {
+        userId: claims.userId,
+        platformRole: session.user.platformRole,
+        expiresAt: Math.min(
+          session.expiresAt.getTime(),
+          now + this.config.auth.accessTokenTtlSeconds * 1000,
+        ),
+      });
+    }
     return { ...claims, platformRole: session.user.platformRole };
   }
 
   async revoke(sessionId: string, userId?: string): Promise<void> {
-    await this.prisma.authSession.updateMany({
+    const revoked = await this.prisma.authSession.updateMany({
       where: { id: sessionId, ...(userId ? { userId } : {}) },
       data: { revokedAt: new Date() },
     });
+    if (revoked.count > 0) this.invalidateSession(sessionId);
   }
 
   async deleteForUser(userId: string): Promise<void> {
     await this.prisma.authSession.deleteMany({ where: { userId } });
+    this.invalidateUserSessions(userId);
+  }
+
+  private cacheSession(sessionId: string, session: CachedSession): void {
+    this.sessionCache.delete(sessionId);
+    if (this.sessionCache.size >= MAX_CACHED_SESSIONS) {
+      const oldestSessionId = this.sessionCache.keys().next().value as
+        string | undefined;
+      if (oldestSessionId) this.sessionCache.delete(oldestSessionId);
+    }
+    this.sessionCache.set(sessionId, session);
+  }
+
+  private invalidateSession(sessionId: string): void {
+    this.cacheEpoch += 1;
+    this.sessionCache.delete(sessionId);
+  }
+
+  private invalidateUserSessions(userId: string): void {
+    this.cacheEpoch += 1;
+    for (const [sessionId, session] of this.sessionCache) {
+      if (session.userId === userId) this.sessionCache.delete(sessionId);
+    }
   }
 
   private async tokensFor(
