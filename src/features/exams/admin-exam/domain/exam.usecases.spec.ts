@@ -44,7 +44,7 @@ function repositoryMock() {
     scheduleDraft,
     updateMetadata,
     updateContent,
-    findActiveCandidatesByEmails: jest.fn(),
+    findActiveCandidatesByIds: jest.fn(),
   };
   return {
     repository,

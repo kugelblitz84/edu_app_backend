@@ -1,19 +1,12 @@
 import { Inject, Injectable } from '@nestjs/common';
 import { randomUUID } from 'node:crypto';
 import { jwtVerify, SignJWT } from 'jose';
-import { APP_CONFIG, type AppConfig } from '../../../core/config/app-config';
-import type { ExamScope } from '../admin-exam/domain/exam.types';
-
-export interface ExamInvitationSubject {
-  examId: string;
-  examScope: ExamScope;
-  userId: string;
-}
-
-export interface GeneratedExamInvitation extends ExamInvitationSubject {
-  token: string;
-  expiresAt: Date;
-}
+import { APP_CONFIG, type AppConfig } from '../../../../core/config/app-config';
+import {
+  ExamInvitationTokenService,
+  type ExamInvitationSubject,
+  type GeneratedExamInvitation,
+} from '../domain/exam-invitation.services';
 
 interface ExamInvitationPayload {
   sub?: unknown;
@@ -25,7 +18,7 @@ interface ExamInvitationPayload {
 }
 
 @Injectable()
-export class ExamInvitationTokenService {
+export class JwtExamInvitationTokenService implements ExamInvitationTokenService {
   constructor(@Inject(APP_CONFIG) private readonly config: AppConfig) {}
 
   async generate(

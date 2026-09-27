@@ -1,5 +1,5 @@
 import { ForbiddenException } from '@nestjs/common';
-import type { ExamInvitationTokenService } from '../../invitations/exam-invitation-token.service';
+import type { ExamInvitationTokenService } from '../../admin-exam/domain/exam-invitation.services';
 import { UserExamRepository } from './user-exam.contracts';
 import { UserExamUseCases } from './user-exam.usecases';
 

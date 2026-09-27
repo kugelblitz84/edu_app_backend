@@ -2,18 +2,17 @@ import { z } from 'zod';
 
 export const generateExamInvitationsSchema = z
   .object({
-    candidateEmails: z
-      .array(z.string().trim().toLowerCase().pipe(z.email()))
-      .min(1)
-      .max(1000),
+    candidateUserIds: z.array(z.string().uuid()).min(1).max(1000),
   })
   .strict()
   .superRefine((input, context) => {
-    if (new Set(input.candidateEmails).size !== input.candidateEmails.length) {
+    if (
+      new Set(input.candidateUserIds).size !== input.candidateUserIds.length
+    ) {
       context.addIssue({
         code: 'custom',
-        path: ['candidateEmails'],
-        message: 'Candidate emails must be unique.',
+        path: ['candidateUserIds'],
+        message: 'Candidate user IDs must be unique.',
       });
     }
   });
@@ -23,6 +22,7 @@ export type GenerateExamInvitationsRequestDto = z.infer<
 >;
 
 export interface GeneratedExamInvitationDto {
+  userId: string;
   email: string;
   token: string;
   expiresAt: Date;

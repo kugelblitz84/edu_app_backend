@@ -1,14 +1,18 @@
 import {
   BadRequestException,
   ConflictException,
+  ForbiddenException,
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { ExamInvitationTokenService } from '../../invitations/exam-invitation-token.service';
 import type {
   GenerateExamInvitationsRequestDto,
   GenerateExamInvitationsResponseDto,
 } from '../presentation/exam-invitation.dto';
+import {
+  ExamInvitationBulkMailService,
+  ExamInvitationTokenService,
+} from './exam-invitation.services';
 import { ExamRepository } from './exam.repository';
 
 @Injectable()
@@ -16,6 +20,7 @@ export class ExamInvitationUseCases {
   constructor(
     private readonly repository: ExamRepository,
     private readonly tokens: ExamInvitationTokenService,
+    private readonly mailer: ExamInvitationBulkMailService,
   ) {}
 
   async generate(
@@ -28,27 +33,32 @@ export class ExamInvitationUseCases {
       requestingUserId,
     );
     if (!exam) throw new NotFoundException('Exam not found.');
+    if (exam.createdByUserId !== requestingUserId) {
+      throw new ForbiddenException(
+        'Only the exam author can invite candidates.',
+      );
+    }
     if (exam.accessMode !== 'INVITE_ONLY') {
       throw new ConflictException(
         'Invitation tokens can only be generated for invite-only exams.',
       );
     }
 
-    const candidates = await this.repository.findActiveCandidatesByEmails(
-      input.candidateEmails,
+    const candidates = await this.repository.findActiveCandidatesByIds(
+      input.candidateUserIds,
     );
-    if (candidates.length !== input.candidateEmails.length) {
+    if (candidates.length !== input.candidateUserIds.length) {
       throw new BadRequestException(
         'Every candidate must have an active account.',
       );
     }
 
-    const candidatesByEmail = new Map(
-      candidates.map((candidate) => [candidate.email.toLowerCase(), candidate]),
+    const candidatesById = new Map(
+      candidates.map((candidate) => [candidate.id, candidate]),
     );
     const invitations = await Promise.all(
-      input.candidateEmails.map(async (email) => {
-        const candidate = candidatesByEmail.get(email);
+      input.candidateUserIds.map(async (userId) => {
+        const candidate = candidatesById.get(userId);
         if (!candidate) {
           throw new BadRequestException(
             'Every candidate must have an active account.',
@@ -60,11 +70,19 @@ export class ExamInvitationUseCases {
           userId: candidate.id,
         });
         return {
+          userId: candidate.id,
           email: candidate.email,
           token: invitation.token,
           expiresAt: invitation.expiresAt,
         };
       }),
+    );
+
+    await this.mailer.sendBulk(
+      invitations.map((invitation) => ({
+        ...invitation,
+        examId,
+      })),
     );
 
     return { examId, invitations };

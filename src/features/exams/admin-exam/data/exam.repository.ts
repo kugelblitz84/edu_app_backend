@@ -188,10 +188,10 @@ export class PrismaMongoExamRepository implements ExamRepository {
       .exec();
   }
 
-  findActiveCandidatesByEmails(emails: string[]): Promise<ActiveCandidate[]> {
+  findActiveCandidatesByIds(userIds: string[]): Promise<ActiveCandidate[]> {
     return this.prisma.user.findMany({
       where: {
-        email: { in: emails },
+        id: { in: userIds },
         status: 'ACTIVE',
         deletedAt: null,
       },

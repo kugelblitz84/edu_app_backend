@@ -1,16 +1,17 @@
 import { generateExamInvitationsSchema } from './exam-invitation.dto';
 
 describe('exam invitation schema', () => {
-  it('normalizes candidate emails and rejects duplicates', () => {
+  it('accepts user IDs and rejects duplicates', () => {
+    const candidateId = '9c45926e-fab7-4873-b219-02330fba39b8';
     expect(
       generateExamInvitationsSchema.parse({
-        candidateEmails: [' Candidate@Example.com '],
+        candidateUserIds: [candidateId],
       }),
-    ).toEqual({ candidateEmails: ['candidate@example.com'] });
+    ).toEqual({ candidateUserIds: [candidateId] });
 
     expect(
       generateExamInvitationsSchema.safeParse({
-        candidateEmails: ['candidate@example.com', 'CANDIDATE@example.com'],
+        candidateUserIds: [candidateId, candidateId],
       }).success,
     ).toBe(false);
   });

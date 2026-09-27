@@ -32,7 +32,7 @@ export abstract class ExamRepository {
     examId: string,
     input: UpdateExamContentInput,
   ): Promise<ExamData | null>;
-  abstract findActiveCandidatesByEmails(
-    emails: string[],
+  abstract findActiveCandidatesByIds(
+    userIds: string[],
   ): Promise<ActiveCandidate[]>;
 }

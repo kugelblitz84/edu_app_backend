@@ -3,7 +3,7 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { ExamInvitationTokenService } from '../../invitations/exam-invitation-token.service';
+import { ExamInvitationTokenService } from '../../admin-exam/domain/exam-invitation.services';
 import { UserExamRepository } from './user-exam.contracts';
 
 export interface ExamAccessAuthorization {

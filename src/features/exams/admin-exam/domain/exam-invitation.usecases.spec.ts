@@ -1,6 +1,10 @@
-import type { ExamInvitationTokenService } from '../../invitations/exam-invitation-token.service';
+import {
+  type ExamInvitationBulkMailService,
+  type ExamInvitationTokenService,
+} from './exam-invitation.services';
 import { ExamInvitationUseCases } from './exam-invitation.usecases';
 import type { ExamRepository } from './exam.repository';
+import { ForbiddenException } from '@nestjs/common';
 
 const exam = {
   id: '8dc198a1-1b0f-4fc1-914d-319917301f3e',
@@ -25,7 +29,7 @@ describe(ExamInvitationUseCases.name, () => {
     };
     const repository = {
       findAccessibleById: jest.fn().mockResolvedValue(exam),
-      findActiveCandidatesByEmails: jest.fn().mockResolvedValue([candidate]),
+      findActiveCandidatesByIds: jest.fn().mockResolvedValue([candidate]),
     } as unknown as ExamRepository;
     const expiresAt = new Date('2026-10-01T00:00:00Z');
     const generate = jest.fn().mockResolvedValue({
@@ -36,16 +40,23 @@ describe(ExamInvitationUseCases.name, () => {
       expiresAt,
     });
     const tokens = { generate } as unknown as ExamInvitationTokenService;
-    const useCases = new ExamInvitationUseCases(repository, tokens);
+    const sendBulk = jest.fn().mockResolvedValue(undefined);
+    const mailer = { sendBulk } as unknown as ExamInvitationBulkMailService;
+    const useCases = new ExamInvitationUseCases(repository, tokens, mailer);
 
     await expect(
       useCases.generate(exam.id, exam.createdByUserId, {
-        candidateEmails: [candidate.email],
+        candidateUserIds: [candidate.id],
       }),
     ).resolves.toEqual({
       examId: exam.id,
       invitations: [
-        { email: candidate.email, token: 'invitation-token', expiresAt },
+        {
+          userId: candidate.id,
+          email: candidate.email,
+          token: 'invitation-token',
+          expiresAt,
+        },
       ],
     });
     expect(generate).toHaveBeenCalledWith({
@@ -53,5 +64,38 @@ describe(ExamInvitationUseCases.name, () => {
       examId: exam.id,
       examScope: exam.scope,
     });
+    expect(sendBulk).toHaveBeenCalledWith([
+      {
+        userId: candidate.id,
+        email: candidate.email,
+        examId: exam.id,
+        token: 'invitation-token',
+        expiresAt,
+      },
+    ]);
+  });
+
+  it('does not generate tokens or send mail for a non-author', async () => {
+    const repository = {
+      findAccessibleById: jest.fn().mockResolvedValue(exam),
+      findActiveCandidatesByIds: jest.fn(),
+    } as unknown as ExamRepository;
+    const generate = jest.fn();
+    const sendBulk = jest.fn();
+    const useCases = new ExamInvitationUseCases(
+      repository,
+      { generate } as unknown as ExamInvitationTokenService,
+      { sendBulk } as unknown as ExamInvitationBulkMailService,
+    );
+
+    await expect(
+      useCases.generate(exam.id, 'different-user-id', {
+        candidateUserIds: ['9c45926e-fab7-4873-b219-02330fba39b8'],
+      }),
+    ).rejects.toBeInstanceOf(ForbiddenException);
+
+    expect(repository.findActiveCandidatesByIds).not.toHaveBeenCalled();
+    expect(generate).not.toHaveBeenCalled();
+    expect(sendBulk).not.toHaveBeenCalled();
   });
 });

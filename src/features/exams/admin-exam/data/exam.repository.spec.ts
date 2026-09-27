@@ -19,15 +19,18 @@ const exam = {
 function repositoryMock() {
   const personalFindFirst = jest.fn();
   const institutionFindFirst = jest.fn();
+  const userFindMany = jest.fn();
   const prisma = {
     personalExam: { findFirst: personalFindFirst },
     institutionExam: { findFirst: institutionFindFirst },
+    user: { findMany: userFindMany },
   } as unknown as PrismaService;
 
   return {
     repository: new PrismaMongoExamRepository(prisma, {} as MongooseService),
     personalFindFirst,
     institutionFindFirst,
+    userFindMany,
   };
 }
 
@@ -77,6 +80,27 @@ describe(PrismaMongoExamRepository.name, () => {
           admins: { some: { userId: adminId } },
         },
       },
+    });
+  });
+
+  it('resolves all active candidate emails in one user ID query', async () => {
+    const { repository, userFindMany } = repositoryMock();
+    const userIds = [
+      '2f273fc1-674b-4763-972c-16a87eb8a616',
+      '9c45926e-fab7-4873-b219-02330fba39b8',
+    ];
+    userFindMany.mockResolvedValue([]);
+
+    await repository.findActiveCandidatesByIds(userIds);
+
+    expect(userFindMany).toHaveBeenCalledTimes(1);
+    expect(userFindMany).toHaveBeenCalledWith({
+      where: {
+        id: { in: userIds },
+        status: 'ACTIVE',
+        deletedAt: null,
+      },
+      select: { id: true, email: true },
     });
   });
 });
