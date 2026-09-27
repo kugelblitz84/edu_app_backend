@@ -5,11 +5,18 @@ import {
   ParseUUIDPipe,
   Patch,
   Post,
+  Header,
 } from '@nestjs/common';
-import { CurrentUser } from '../../../core/auth/decorators/current-user.decorator';
-import type { AuthenticatedUser } from '../../../core/auth/auth.types';
-import { ZodValidationPipe } from '../../../core/validator/zod-validation.pipe';
+import { CurrentUser } from '../../../../core/auth/decorators/current-user.decorator';
+import type { AuthenticatedUser } from '../../../../core/auth/auth.types';
+import { ZodValidationPipe } from '../../../../core/validator/zod-validation.pipe';
 import { ExamUseCases } from '../domain/exam.usecases';
+import { ExamInvitationUseCases } from '../domain/exam-invitation.usecases';
+import {
+  generateExamInvitationsSchema,
+  type GenerateExamInvitationsRequestDto,
+  type GenerateExamInvitationsResponseDto,
+} from './exam-invitation.dto';
 import {
   createExamSchema,
   scheduleExamSchema,
@@ -23,9 +30,12 @@ import {
   type UpdateExamMetadataRequestDto,
 } from './exam.dto';
 
-@Controller({ path: 'exams', version: '1' })
-export class ExamController {
-  constructor(private readonly useCases: ExamUseCases) {}
+@Controller({ path: 'exams/admin', version: '1' })
+export class AdminExamController {
+  constructor(
+    private readonly useCases: ExamUseCases,
+    private readonly invitations: ExamInvitationUseCases,
+  ) {}
 
   @Post('/create')
   async create(
@@ -63,5 +73,16 @@ export class ExamController {
     @CurrentUser() currentUser: AuthenticatedUser,
   ): Promise<ExamContentResponseDto> {
     return this.useCases.updateContent(id, currentUser.userId, input);
+  }
+
+  @Post(':id/invitations')
+  @Header('Cache-Control', 'no-store')
+  async generateInvitations(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body(new ZodValidationPipe(generateExamInvitationsSchema))
+    input: GenerateExamInvitationsRequestDto,
+    @CurrentUser() currentUser: AuthenticatedUser,
+  ): Promise<GenerateExamInvitationsResponseDto> {
+    return this.invitations.generate(id, currentUser.userId, input);
   }
 }

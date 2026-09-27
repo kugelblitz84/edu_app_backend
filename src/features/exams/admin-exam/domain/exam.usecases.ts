@@ -12,7 +12,7 @@ import type {
 } from '../presentation/exam.dto';
 import { ExamRepository } from './exam.repository';
 import type { Exam, UpdateExamMetadataInput } from './exam.types';
-import type { ExamData } from '../../../../mongoose/models/exam-data.model';
+import type { ExamData } from '../../../../../mongoose/models/exam-data.model';
 
 @Injectable()
 export class ExamUseCases {

@@ -12,6 +12,7 @@ const draft: InstitutionalExam = {
   examDate: null,
   durationMinutes: null,
   status: 'DRAFT',
+  accessMode: 'OPEN',
   createdByUserId: '2f273fc1-674b-4763-972c-16a87eb8a616',
   createdAt: new Date('2026-01-01T00:00:00Z'),
   updatedAt: new Date('2026-01-01T00:00:00Z'),
@@ -43,6 +44,7 @@ function repositoryMock() {
     scheduleDraft,
     updateMetadata,
     updateContent,
+    findActiveCandidatesByEmails: jest.fn(),
   };
   return {
     repository,

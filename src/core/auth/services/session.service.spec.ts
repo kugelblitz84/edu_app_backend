@@ -14,6 +14,9 @@ const config: AppConfig = {
     accessTokenSecret: 'test-access-token-secret-at-least-32-characters',
     accessTokenTtlSeconds: 900,
     refreshTokenTtlSeconds: 2_592_000,
+    examInvitationTokenSecret:
+      'test-exam-invitation-secret-at-least-32-characters',
+    examInvitationTokenTtlSeconds: 604_800,
     issuer: 'edu-app-api',
     passwordResetUrl: 'https://example.com/reset',
     passwordResetTtlSeconds: 3600,

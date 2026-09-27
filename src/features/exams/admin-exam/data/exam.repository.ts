@@ -4,9 +4,9 @@ import type { Model } from 'mongoose';
 import {
   examDataSchema,
   type ExamData,
-} from '../../../../mongoose/models/exam-data.model';
-import { MongooseService } from '../../../core/database/mongoose.service';
-import { PrismaService } from '../../../core/database/prisma.service';
+} from '../../../../../mongoose/models/exam-data.model';
+import { MongooseService } from '../../../../core/database/mongoose.service';
+import { PrismaService } from '../../../../core/database/prisma.service';
 import { ExamRepository } from '../domain/exam.repository';
 import type {
   CreateDraftExamInput,
@@ -17,6 +17,7 @@ import type {
   ScheduleExamInput,
   UpdateExamContentInput,
   UpdateExamMetadataInput,
+  ActiveCandidate,
 } from '../domain/exam.types';
 
 @Injectable()
@@ -185,6 +186,17 @@ export class PrismaMongoExamRepository implements ExamRepository {
       )
       .lean<ExamData>()
       .exec();
+  }
+
+  findActiveCandidatesByEmails(emails: string[]): Promise<ActiveCandidate[]> {
+    return this.prisma.user.findMany({
+      where: {
+        email: { in: emails },
+        status: 'ACTIVE',
+        deletedAt: null,
+      },
+      select: { id: true, email: true },
+    });
   }
 
   private get examDataModel(): Model<ExamData> {

@@ -1,5 +1,5 @@
-import type { MongooseService } from '../../../core/database/mongoose.service';
-import type { PrismaService } from '../../../core/database/prisma.service';
+import type { MongooseService } from '../../../../core/database/mongoose.service';
+import type { PrismaService } from '../../../../core/database/prisma.service';
 import { PrismaMongoExamRepository } from './exam.repository';
 
 const exam = {
@@ -9,6 +9,7 @@ const exam = {
   examDate: null,
   durationMinutes: null,
   status: 'DRAFT' as const,
+  accessMode: 'OPEN' as const,
   createdByUserId: '2f273fc1-674b-4763-972c-16a87eb8a616',
   createdAt: new Date('2026-01-01T00:00:00Z'),
   updatedAt: new Date('2026-01-01T00:00:00Z'),

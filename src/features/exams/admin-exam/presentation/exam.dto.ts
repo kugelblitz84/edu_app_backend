@@ -3,6 +3,7 @@ import { z } from 'zod';
 const createExamBaseSchema = z.object({
   name: z.string().trim().min(1).max(200),
   description: z.string().trim().min(1).max(1000).optional(),
+  accessMode: z.enum(['OPEN', 'INVITE_ONLY']).default('OPEN'),
 });
 
 export const createExamSchema = z.discriminatedUnion('scope', [
@@ -41,7 +42,7 @@ export const scheduleExamSchema = z
   .object({
     examDate: z.iso.datetime({ offset: true }),
     durationMinutes: z.number().int().positive(),
-    questions: z.array(examQuestionSchema).min(1),
+    questions: z.array(examQuestionSchema).min(1).max(100),
   })
   .strict();
 
@@ -53,7 +54,14 @@ export const updateExamMetadataSchema = z
     name: z.string().trim().min(1).max(200).optional(),
     description: z.string().trim().min(1).max(1000).nullable().optional(),
     examDate: z.iso.datetime({ offset: true }).nullable().optional(),
-    durationMinutes: z.number().int().positive().nullable().optional(),
+    durationMinutes: z
+      .number()
+      .int()
+      .positive()
+      .max(1440 * 7)
+      .nullable()
+      .optional(),
+    accessMode: z.enum(['OPEN', 'INVITE_ONLY']).optional(),
   })
   .strict()
   .refine((input) => Object.keys(input).length > 0, {
@@ -62,7 +70,7 @@ export const updateExamMetadataSchema = z
 
 export const updateExamContentSchema = z
   .object({
-    questions: z.array(examQuestionSchema).min(1).optional(),
+    questions: z.array(examQuestionSchema).min(1).max(100).optional(),
   })
   .strict()
   .refine((input) => Object.keys(input).length > 0, {
@@ -85,6 +93,7 @@ export interface ExamResponseDto {
   examDate: Date | null;
   durationMinutes: number | null;
   status: 'DRAFT' | 'SCHEDULED' | 'RUNNING' | 'COMPLETED' | 'CANCELLED';
+  accessMode: 'OPEN' | 'INVITE_ONLY';
   createdByUserId: string;
   createdAt: Date;
   updatedAt: Date;

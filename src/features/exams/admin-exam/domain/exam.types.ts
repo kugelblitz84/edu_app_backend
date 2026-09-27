@@ -1,9 +1,10 @@
-import type { ExamQuestion } from '../../../../mongoose/models/exam-data.model';
+import type { ExamQuestion } from '../../../../../mongoose/models/exam-data.model';
 
 export type ExamStatus =
   'DRAFT' | 'SCHEDULED' | 'RUNNING' | 'COMPLETED' | 'CANCELLED';
 
 export type ExamScope = 'PUBLIC' | 'INSTITUTIONAL';
+export type ExamAccessMode = 'OPEN' | 'INVITE_ONLY';
 
 interface ExamBase {
   id: string;
@@ -12,6 +13,7 @@ interface ExamBase {
   examDate: Date | null;
   durationMinutes: number | null;
   status: ExamStatus;
+  accessMode: ExamAccessMode;
   createdByUserId: string;
   createdAt: Date;
   updatedAt: Date;
@@ -33,6 +35,7 @@ interface CreateDraftExamBase {
   name: string;
   description?: string;
   createdByUserId: string;
+  accessMode: ExamAccessMode;
 }
 
 export interface CreatePublicDraftExamInput extends CreateDraftExamBase {
@@ -58,6 +61,12 @@ export interface UpdateExamMetadataInput {
   description?: string | null;
   examDate?: Date | null;
   durationMinutes?: number | null;
+  accessMode?: ExamAccessMode;
+}
+
+export interface ActiveCandidate {
+  id: string;
+  email: string;
 }
 
 export interface UpdateExamContentInput {

@@ -14,6 +14,8 @@ export interface AppConfig {
     accessTokenSecret: string;
     accessTokenTtlSeconds: number;
     refreshTokenTtlSeconds: number;
+    examInvitationTokenSecret: string;
+    examInvitationTokenTtlSeconds: number;
     issuer: string;
     passwordResetUrl: string;
     passwordResetTtlSeconds: number;
@@ -171,6 +173,12 @@ export function loadAppConfig(): AppConfig {
     nodeEnv,
     'development-access-token-secret-change-me',
   );
+  const examInvitationTokenSecret = loadTokenSecret(
+    'EXAM_INVITATION_TOKEN_SECRET',
+    process.env.EXAM_INVITATION_TOKEN_SECRET,
+    nodeEnv,
+    'development-exam-invitation-secret-change-me',
+  );
   if (nodeEnv === 'production' && !smtpHost) {
     throw new Error('SMTP_HOST is required in production.');
   }
@@ -202,6 +210,12 @@ export function loadAppConfig(): AppConfig {
         'JWT_REFRESH_TTL_SECONDS',
         process.env.JWT_REFRESH_TTL_SECONDS,
         30 * 24 * 60 * 60,
+      ),
+      examInvitationTokenSecret,
+      examInvitationTokenTtlSeconds: parsePositiveInteger(
+        'EXAM_INVITATION_TOKEN_TTL_SECONDS',
+        process.env.EXAM_INVITATION_TOKEN_TTL_SECONDS,
+        7 * 24 * 60 * 60,
       ),
       issuer: process.env.JWT_ISSUER?.trim() || 'edu-app-api',
       passwordResetUrl: loadHttpsUrl(

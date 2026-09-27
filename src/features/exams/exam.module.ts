@@ -1,17 +1,8 @@
 import { Module } from '@nestjs/common';
-import { MongooseModule } from '../../core/database/mongoose.module';
-import { PrismaModule } from '../../core/database/prisma.module';
-import { PrismaMongoExamRepository } from './data/exam.repository';
-import { ExamRepository } from './domain/exam.repository';
-import { ExamUseCases } from './domain/exam.usecases';
-import { ExamController } from './presentation/exam.controllers';
+import { AdminExamModule } from './admin-exam/admin-exam.module';
+import { UserExamModule } from './user-exam/user-exam.module';
 
 @Module({
-  imports: [PrismaModule, MongooseModule],
-  providers: [
-    ExamUseCases,
-    { provide: ExamRepository, useClass: PrismaMongoExamRepository },
-  ],
-  controllers: [ExamController],
+  imports: [AdminExamModule, UserExamModule],
 })
 export class ExamModule {}

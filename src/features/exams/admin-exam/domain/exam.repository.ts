@@ -5,8 +5,9 @@ import type {
   ScheduleExamInput,
   UpdateExamContentInput,
   UpdateExamMetadataInput,
+  ActiveCandidate,
 } from './exam.types';
-import type { ExamData } from '../../../../mongoose/models/exam-data.model';
+import type { ExamData } from '../../../../../mongoose/models/exam-data.model';
 
 export abstract class ExamRepository {
   abstract createDraft(input: CreateDraftExamInput): Promise<Exam | null>;
@@ -31,4 +32,7 @@ export abstract class ExamRepository {
     examId: string,
     input: UpdateExamContentInput,
   ): Promise<ExamData | null>;
+  abstract findActiveCandidatesByEmails(
+    emails: string[],
+  ): Promise<ActiveCandidate[]>;
 }
