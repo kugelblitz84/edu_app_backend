@@ -1,10 +1,11 @@
 import { ConflictException } from '@nestjs/common';
 import { ExamRepository } from './exam.repository';
-import type { InstitutionExam } from './exam.types';
+import type { InstitutionalExam } from './exam.types';
 import { ExamUseCases } from './exam.usecases';
 
-const draft: InstitutionExam = {
+const draft: InstitutionalExam = {
   id: '8dc198a1-1b0f-4fc1-914d-319917301f3e',
+  scope: 'INSTITUTIONAL',
   institutionId: 'ed52b4d1-b69a-4705-bd3f-f946170a4813',
   name: 'Final',
   description: null,
@@ -151,9 +152,14 @@ describe('ExamUseCases updates', () => {
       { name: 'Updated final' },
     );
 
-    expect(updateMetadata).toHaveBeenCalledWith(draft.id, {
-      name: 'Updated final',
-    });
+    expect(updateMetadata).toHaveBeenCalledWith(
+      draft.id,
+      'INSTITUTIONAL',
+      draft.createdByUserId,
+      {
+        name: 'Updated final',
+      },
+    );
   });
 
   it('updates Mongo content for a scheduled exam', async () => {

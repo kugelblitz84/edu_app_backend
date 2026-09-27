@@ -9,7 +9,7 @@ import {
 } from '@nestjs/common';
 import { CurrentUser } from '../../../core/auth/decorators/current-user.decorator';
 import type { AuthenticatedUser } from '../../../core/auth/auth.types';
-import { Role } from '../../../core/auth/decorators/roles.decorator';
+import { Roles } from '../../../core/auth/decorators/roles.decorator';
 import { ZodValidationPipe } from '../../../core/validator/zod-validation.pipe';
 import type { ReviewPageOptions } from '../domain/contracts/types';
 import { GlobalAdminUseCases } from '../domain/usecases';
@@ -25,7 +25,7 @@ import {
 } from './global-admin.dto';
 
 @Controller({ path: 'global-admin/institutions', version: '1' })
-@Role('GLOBAL_ADMIN')
+@Roles('GLOBAL_ADMIN')
 export class GlobalAdminController {
   constructor(private readonly useCases: GlobalAdminUseCases) {}
 

@@ -11,7 +11,7 @@ import type {
   UpdateExamMetadataRequestDto,
 } from '../presentation/exam.dto';
 import { ExamRepository } from './exam.repository';
-import type { InstitutionExam, UpdateExamMetadataInput } from './exam.types';
+import type { Exam, UpdateExamMetadataInput } from './exam.types';
 import type { ExamData } from '../../../../mongoose/models/exam-data.model';
 
 @Injectable()
@@ -21,15 +21,13 @@ export class ExamUseCases {
   async createDraft(
     userId: string,
     input: CreateExamRequestDto,
-  ): Promise<InstitutionExam> {
+  ): Promise<Exam> {
     const exam = await this.repository.createDraft({
       ...input,
       createdByUserId: userId,
     });
     if (!exam) {
-      throw new ForbiddenException(
-        'You are not an administrator of this active institution.',
-      );
+      throw new ForbiddenException('You cannot create this exam.');
     }
     return exam;
   }
@@ -38,7 +36,7 @@ export class ExamUseCases {
     id: string,
     userId: string,
     input: ScheduleExamRequestDto,
-  ): Promise<InstitutionExam> {
+  ): Promise<Exam> {
     const exam = await this.repository.findAccessibleById(id, userId);
     if (!exam) throw new NotFoundException('Exam not found.');
     if (exam.status !== 'DRAFT') {
@@ -49,10 +47,15 @@ export class ExamUseCases {
     // retry safe when the following PostgreSQL operation fails.
     await this.repository.upsertExamData(id, input.questions);
 
-    const scheduled = await this.repository.scheduleDraft(id, {
-      examDate: new Date(input.examDate),
-      durationMinutes: input.durationMinutes,
-    });
+    const scheduled = await this.repository.scheduleDraft(
+      id,
+      exam.scope,
+      userId,
+      {
+        examDate: new Date(input.examDate),
+        durationMinutes: input.durationMinutes,
+      },
+    );
     if (!scheduled) {
       throw new ConflictException('Only a draft exam can be scheduled.');
     }
@@ -63,8 +66,8 @@ export class ExamUseCases {
     id: string,
     userId: string,
     input: UpdateExamMetadataRequestDto,
-  ): Promise<InstitutionExam> {
-    await this.requireEditableExam(id, userId);
+  ): Promise<Exam> {
+    const exam = await this.requireEditableExam(id, userId);
 
     const { examDate, ...otherMetadata } = input;
     const metadata: UpdateExamMetadataInput = otherMetadata;
@@ -72,7 +75,12 @@ export class ExamUseCases {
       metadata.examDate = examDate === null ? null : new Date(examDate);
     }
 
-    const updated = await this.repository.updateMetadata(id, metadata);
+    const updated = await this.repository.updateMetadata(
+      id,
+      exam.scope,
+      userId,
+      metadata,
+    );
     if (!updated) throw new NotFoundException('Exam not found.');
     return updated;
   }
@@ -89,7 +97,7 @@ export class ExamUseCases {
     return updated;
   }
 
-  private async requireEditableExam(id: string, userId: string): Promise<void> {
+  private async requireEditableExam(id: string, userId: string): Promise<Exam> {
     const exam = await this.repository.findAccessibleById(id, userId);
     if (!exam) throw new NotFoundException('Exam not found.');
     if (exam.status !== 'DRAFT' && exam.status !== 'SCHEDULED') {
@@ -97,6 +105,6 @@ export class ExamUseCases {
         'Only draft or scheduled exams can be updated.',
       );
     }
-    // return exam;
+    return exam;
   }
 }

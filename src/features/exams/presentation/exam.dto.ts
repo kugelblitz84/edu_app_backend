@@ -1,12 +1,23 @@
 import { z } from 'zod';
 
-export const createExamSchema = z
-  .object({
-    institutionId: z.string().uuid(),
-    name: z.string().trim().min(1).max(200),
-    description: z.string().trim().min(1).max(1000).optional(),
-  })
-  .strict();
+const createExamBaseSchema = z.object({
+  name: z.string().trim().min(1).max(200),
+  description: z.string().trim().min(1).max(1000).optional(),
+});
+
+export const createExamSchema = z.discriminatedUnion('scope', [
+  createExamBaseSchema
+    .extend({
+      scope: z.literal('PUBLIC'),
+    })
+    .strict(),
+  createExamBaseSchema
+    .extend({
+      scope: z.literal('INSTITUTIONAL'),
+      institutionId: z.string().uuid(),
+    })
+    .strict(),
+]);
 
 export const examQuestionSchema = z
   .object({
@@ -67,7 +78,8 @@ export type UpdateExamContentRequestDto = z.infer<
 
 export interface ExamResponseDto {
   id: string;
-  institutionId: string;
+  scope: 'PUBLIC' | 'INSTITUTIONAL';
+  institutionId: string | null;
   name: string;
   description: string | null;
   examDate: Date | null;

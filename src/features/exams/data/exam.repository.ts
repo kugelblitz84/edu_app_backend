@@ -1,4 +1,5 @@
 import { Injectable } from '@nestjs/common';
+import { ExamStatus as PrismaExamStatus } from '@prisma/client';
 import type { Model } from 'mongoose';
 import {
   examDataSchema,
@@ -9,7 +10,10 @@ import { PrismaService } from '../../../core/database/prisma.service';
 import { ExamRepository } from '../domain/exam.repository';
 import type {
   CreateDraftExamInput,
-  InstitutionExam,
+  Exam,
+  ExamScope,
+  InstitutionalExam,
+  PublicExam,
   ScheduleExamInput,
   UpdateExamContentInput,
   UpdateExamMetadataInput,
@@ -22,9 +26,19 @@ export class PrismaMongoExamRepository implements ExamRepository {
     private readonly mongoose: MongooseService,
   ) {}
 
-  async createDraft(
-    input: CreateDraftExamInput,
-  ): Promise<InstitutionExam | null> {
+  async createDraft(input: CreateDraftExamInput): Promise<Exam | null> {
+    if (input.scope === 'PUBLIC') {
+      const exam = await this.prisma.personalExam.create({
+        data: {
+          name: input.name,
+          description: input.description,
+          createdByUserId: input.createdByUserId,
+          status: 'DRAFT',
+        },
+      });
+      return this.toPublicExam(exam);
+    }
+
     const membership = await this.prisma.institutionAdmin.findUnique({
       where: {
         institutionId_userId: {
@@ -36,7 +50,7 @@ export class PrismaMongoExamRepository implements ExamRepository {
     });
     if (!membership || membership.institution.status !== 'ACTIVE') return null;
 
-    return this.prisma.institutionExam.create({
+    const exam = await this.prisma.institutionExam.create({
       data: {
         institutionId: input.institutionId,
         name: input.name,
@@ -45,22 +59,29 @@ export class PrismaMongoExamRepository implements ExamRepository {
         status: 'DRAFT',
       },
     });
+    return this.toInstitutionalExam(exam);
   }
 
-  findAccessibleById(
-    id: string,
-    userId: string,
-  ): Promise<InstitutionExam | null> {
-    return this.prisma.institutionExam.findFirst({
-      where: {
-        id,
-        deletedAt: null,
-        institution: {
-          status: 'ACTIVE',
-          admins: { some: { userId } },
+  async findAccessibleById(id: string, userId: string): Promise<Exam | null> {
+    const [publicExam, institutionalExam] = await Promise.all([
+      this.prisma.personalExam.findFirst({
+        where: { id, createdByUserId: userId, deletedAt: null },
+      }),
+      this.prisma.institutionExam.findFirst({
+        where: {
+          id,
+          deletedAt: null,
+          institution: {
+            status: 'ACTIVE',
+            admins: { some: { userId } },
+          },
         },
-      },
-    });
+      }),
+    ]);
+
+    if (publicExam) return this.toPublicExam(publicExam);
+    if (institutionalExam) return this.toInstitutionalExam(institutionalExam);
+    return null;
   }
 
   async upsertExamData(
@@ -78,34 +99,70 @@ export class PrismaMongoExamRepository implements ExamRepository {
 
   async scheduleDraft(
     id: string,
+    scope: ExamScope,
+    userId: string,
     input: Pick<ScheduleExamInput, 'examDate' | 'durationMinutes'>,
-  ): Promise<InstitutionExam | null> {
+  ): Promise<Exam | null> {
+    const where = this.editableWhere(id, scope, userId);
+    const data = {
+      examDate: input.examDate,
+      durationMinutes: input.durationMinutes,
+      status: 'SCHEDULED' as const,
+    };
+
+    if (scope === 'PUBLIC') {
+      const result = await this.prisma.personalExam.updateMany({
+        where: { ...where, status: 'DRAFT' },
+        data,
+      });
+      if (result.count === 0) return null;
+      const exam = await this.prisma.personalExam.findUnique({ where: { id } });
+      return exam ? this.toPublicExam(exam) : null;
+    }
+
     const result = await this.prisma.institutionExam.updateMany({
-      where: { id, status: 'DRAFT', deletedAt: null },
+      where: { ...where, status: 'DRAFT' },
       data: {
-        examDate: input.examDate,
-        durationMinutes: input.durationMinutes,
-        status: 'SCHEDULED',
+        ...data,
       },
     });
     if (result.count === 0) return null;
-    return this.prisma.institutionExam.findUnique({ where: { id } });
+    const exam = await this.prisma.institutionExam.findUnique({
+      where: { id },
+    });
+    return exam ? this.toInstitutionalExam(exam) : null;
   }
 
   async updateMetadata(
     id: string,
+    scope: ExamScope,
+    userId: string,
     input: UpdateExamMetadataInput,
-  ): Promise<InstitutionExam | null> {
+  ): Promise<Exam | null> {
+    const where = {
+      ...this.editableWhere(id, scope, userId),
+      status: { in: [PrismaExamStatus.DRAFT, PrismaExamStatus.SCHEDULED] },
+    };
+
+    if (scope === 'PUBLIC') {
+      const result = await this.prisma.personalExam.updateMany({
+        where,
+        data: input,
+      });
+      if (result.count === 0) return null;
+      const exam = await this.prisma.personalExam.findUnique({ where: { id } });
+      return exam ? this.toPublicExam(exam) : null;
+    }
+
     const result = await this.prisma.institutionExam.updateMany({
-      where: {
-        id,
-        status: { in: ['DRAFT', 'SCHEDULED'] },
-        deletedAt: null,
-      },
+      where,
       data: input,
     });
     if (result.count === 0) return null;
-    return this.prisma.institutionExam.findUnique({ where: { id } });
+    const exam = await this.prisma.institutionExam.findUnique({
+      where: { id },
+    });
+    return exam ? this.toInstitutionalExam(exam) : null;
   }
 
   async updateContent(
@@ -136,5 +193,32 @@ export class PrismaMongoExamRepository implements ExamRepository {
         Model<ExamData> | undefined) ??
       this.mongoose.connection.model<ExamData>('ExamData', examDataSchema)
     );
+  }
+
+  private editableWhere(id: string, scope: ExamScope, userId: string) {
+    if (scope === 'PUBLIC') {
+      return { id, createdByUserId: userId, deletedAt: null };
+    }
+
+    return {
+      id,
+      deletedAt: null,
+      institution: {
+        status: 'ACTIVE' as const,
+        admins: { some: { userId } },
+      },
+    };
+  }
+
+  private toPublicExam(
+    exam: Omit<PublicExam, 'scope' | 'institutionId'>,
+  ): PublicExam {
+    return { ...exam, scope: 'PUBLIC', institutionId: null };
+  }
+
+  private toInstitutionalExam(
+    exam: Omit<InstitutionalExam, 'scope'>,
+  ): InstitutionalExam {
+    return { ...exam, scope: 'INSTITUTIONAL' };
   }
 }
