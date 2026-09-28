@@ -64,6 +64,7 @@ export class AccessTokenService {
       sessionId: claims.sid,
       platformRole: claims.role,
       issuedAt: new Date(claims.iat * 1000),
+      expiresAt: new Date(claims.exp * 1000),
     };
   }
 

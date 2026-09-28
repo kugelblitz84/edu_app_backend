@@ -1,5 +1,3 @@
-import type { ExamQuestion } from '../../../../../mongoose/models/exam-data.model';
-
 export type ExamStatus =
   'DRAFT' | 'SCHEDULED' | 'RUNNING' | 'COMPLETED' | 'CANCELLED';
 
@@ -10,8 +8,12 @@ interface ExamBase {
   id: string;
   name: string;
   description: string | null;
-  examDate: Date | null;
+  startsAt: Date | null;
+  closesAt: Date | null;
   durationMinutes: number | null;
+  maxAttempts: number;
+  passPercentage: number | null;
+  contentVersion: number;
   status: ExamStatus;
   accessMode: ExamAccessMode;
   createdByUserId: string;
@@ -51,16 +53,29 @@ export type CreateDraftExamInput =
   CreatePublicDraftExamInput | CreateInstitutionalDraftExamInput;
 
 export interface ScheduleExamInput {
-  examDate: Date;
+  startsAt: Date;
+  closesAt: Date;
   durationMinutes: number;
-  questions: ExamQuestion[];
+  maxAttempts: number;
+  passPercentage?: number | null;
+  questions: AuthoringExamQuestion[];
+}
+
+export interface AuthoringExamQuestion {
+  question: string;
+  options: string[];
+  correctAnswer: string;
+  markValue: number;
 }
 
 export interface UpdateExamMetadataInput {
   name?: string;
   description?: string | null;
-  examDate?: Date | null;
+  startsAt?: Date | null;
+  closesAt?: Date | null;
   durationMinutes?: number | null;
+  maxAttempts?: number;
+  passPercentage?: number | null;
   accessMode?: ExamAccessMode;
 }
 
@@ -70,5 +85,5 @@ export interface ActiveCandidate {
 }
 
 export interface UpdateExamContentInput {
-  questions?: ExamQuestion[];
+  questions?: AuthoringExamQuestion[];
 }

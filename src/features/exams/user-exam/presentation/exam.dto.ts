@@ -26,7 +26,7 @@ export const publicExamQuerySchema = z
     limit: z.coerce.number().int().min(1).max(100).default(20),
     status: z.enum(['SCHEDULED', 'RUNNING', 'COMPLETED']).optional(),
     prefix: z.string().trim().min(1).max(200).optional(),
-    orderBy: z.enum(['name', 'examDate', 'createdAt']).default('createdAt'),
+    orderBy: z.enum(['name', 'startsAt', 'createdAt']).default('createdAt'),
     order: z.enum(['asc', 'desc']).default('desc'),
   })
   .strict();
@@ -37,7 +37,8 @@ export interface PublicExamResponseDto {
   id: string;
   name: string;
   description: string | null;
-  examDate: Date | null;
+  startsAt: Date | null;
+  closesAt: Date | null;
   durationMinutes: number | null;
   status: 'SCHEDULED' | 'RUNNING' | 'COMPLETED';
   accessMode: 'OPEN' | 'INVITE_ONLY';

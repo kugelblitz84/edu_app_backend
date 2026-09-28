@@ -43,17 +43,24 @@ export class ExamUseCases {
       throw new ConflictException('Only a draft exam can be scheduled.');
     }
 
-    // Mongo is deliberately written first. Its unique examId upsert makes a
-    // retry safe when the following PostgreSQL operation fails.
-    await this.repository.upsertExamData(id, input.questions);
+    const contentVersion = exam.contentVersion + 1;
+    await this.repository.createExamDataVersion(
+      id,
+      contentVersion,
+      input.questions,
+    );
 
     const scheduled = await this.repository.scheduleDraft(
       id,
       exam.scope,
       userId,
       {
-        examDate: new Date(input.examDate),
+        startsAt: new Date(input.startsAt),
+        closesAt: new Date(input.closesAt),
         durationMinutes: input.durationMinutes,
+        maxAttempts: input.maxAttempts,
+        passPercentage: input.passPercentage,
+        contentVersion,
       },
     );
     if (!scheduled) {
@@ -69,11 +76,12 @@ export class ExamUseCases {
   ): Promise<Exam> {
     const exam = await this.requireEditableExam(id, userId);
 
-    const { examDate, ...otherMetadata } = input;
+    const { startsAt, closesAt, ...otherMetadata } = input;
     const metadata: UpdateExamMetadataInput = otherMetadata;
-    if (examDate !== undefined) {
-      metadata.examDate = examDate === null ? null : new Date(examDate);
-    }
+    if (startsAt !== undefined)
+      metadata.startsAt = startsAt === null ? null : new Date(startsAt);
+    if (closesAt !== undefined)
+      metadata.closesAt = closesAt === null ? null : new Date(closesAt);
 
     const updated = await this.repository.updateMetadata(
       id,
@@ -104,6 +112,9 @@ export class ExamUseCases {
       throw new ConflictException(
         'Only draft or scheduled exams can be updated.',
       );
+    }
+    if (exam.startsAt && exam.startsAt <= new Date()) {
+      throw new ConflictException('An exam cannot be edited after it starts.');
     }
     return exam;
   }

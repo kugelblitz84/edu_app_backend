@@ -4,12 +4,14 @@ import { NestExpressApplication } from '@nestjs/platform-express';
 import { AppModule } from './app.module';
 import { APP_CONFIG, AppConfig } from '../core/config/app-config';
 import helmet from 'helmet';
+import { IoAdapter } from '@nestjs/platform-socket.io';
 export async function bootstrap(): Promise<void> {
   const app = await NestFactory.create<NestExpressApplication>(AppModule, {
     bufferLogs: true,
   });
 
   const config = app.get<AppConfig>(APP_CONFIG);
+  app.useWebSocketAdapter(new IoAdapter(app));
 
   const isProduction = config.nodeEnv === 'production';
   const isTest = config.nodeEnv === 'test';

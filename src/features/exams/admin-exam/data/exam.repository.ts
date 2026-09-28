@@ -1,5 +1,10 @@
 import { Injectable } from '@nestjs/common';
 import { ExamStatus as PrismaExamStatus } from '@prisma/client';
+import type {
+  InstitutionExam as PrismaInstitutionExam,
+  PersonalExam as PrismaPersonalExam,
+} from '@prisma/client';
+import { randomUUID } from 'node:crypto';
 import type { Model } from 'mongoose';
 import {
   examDataSchema,
@@ -85,14 +90,22 @@ export class PrismaMongoExamRepository implements ExamRepository {
     return null;
   }
 
-  async upsertExamData(
+  async createExamDataVersion(
     examId: string,
+    version: number,
     questions: ScheduleExamInput['questions'],
   ): Promise<void> {
     await this.examDataModel
-      .replaceOne(
-        { examId },
-        { examId, totalQuestions: questions.length, questions },
+      .updateOne(
+        { examId, version },
+        {
+          $setOnInsert: {
+            examId,
+            version,
+            totalQuestions: questions.length,
+            questions: this.withStableIds(questions),
+          },
+        },
         { upsert: true, runValidators: true },
       )
       .exec();
@@ -102,12 +115,16 @@ export class PrismaMongoExamRepository implements ExamRepository {
     id: string,
     scope: ExamScope,
     userId: string,
-    input: Pick<ScheduleExamInput, 'examDate' | 'durationMinutes'>,
+    input: Omit<ScheduleExamInput, 'questions'> & { contentVersion: number },
   ): Promise<Exam | null> {
     const where = this.editableWhere(id, scope, userId);
     const data = {
-      examDate: input.examDate,
+      startsAt: input.startsAt,
+      closesAt: input.closesAt,
       durationMinutes: input.durationMinutes,
+      maxAttempts: input.maxAttempts,
+      passPercentage: input.passPercentage,
+      contentVersion: input.contentVersion,
       status: 'SCHEDULED' as const,
     };
 
@@ -172,20 +189,43 @@ export class PrismaMongoExamRepository implements ExamRepository {
   ): Promise<ExamData | null> {
     const questions = input.questions;
     if (!questions) return null;
+    const timeWhere = {
+      id: examId,
+      deletedAt: null,
+      status: { in: [PrismaExamStatus.DRAFT, PrismaExamStatus.SCHEDULED] },
+      OR: [{ startsAt: null }, { startsAt: { gt: new Date() } }],
+    };
+    const attemptCount = await this.prisma.examAttempt.count({
+      where: { examId },
+    });
+    if (attemptCount > 0) return null;
+    const [personal, institutional] = await Promise.all([
+      this.prisma.personalExam.findFirst({ where: timeWhere }),
+      this.prisma.institutionExam.findFirst({ where: timeWhere }),
+    ]);
+    const exam = personal ?? institutional;
+    if (!exam) return null;
 
-    return this.examDataModel
-      .findOneAndUpdate(
-        { examId },
-        {
-          $set: {
-            questions,
-            totalQuestions: questions.length,
-          },
-        },
-        { new: true, runValidators: true },
-      )
-      .lean<ExamData>()
-      .exec();
+    const version = exam.contentVersion + 1;
+    const data = {
+      examId,
+      version,
+      totalQuestions: questions.length,
+      questions: this.withStableIds(questions),
+    };
+    const created = await this.examDataModel.create(data);
+    const versionWhere = { ...timeWhere, contentVersion: exam.contentVersion };
+    const updated = personal
+      ? await this.prisma.personalExam.updateMany({
+          where: versionWhere,
+          data: { contentVersion: version },
+        })
+      : await this.prisma.institutionExam.updateMany({
+          where: versionWhere,
+          data: { contentVersion: version },
+        });
+    if (updated.count !== 1) return null;
+    return created.toObject<ExamData>();
   }
 
   findActiveCandidatesByIds(userIds: string[]): Promise<ActiveCandidate[]> {
@@ -222,15 +262,41 @@ export class PrismaMongoExamRepository implements ExamRepository {
     };
   }
 
-  private toPublicExam(
-    exam: Omit<PublicExam, 'scope' | 'institutionId'>,
-  ): PublicExam {
-    return { ...exam, scope: 'PUBLIC', institutionId: null };
+  private toPublicExam(exam: PrismaPersonalExam): PublicExam {
+    return {
+      ...exam,
+      passPercentage:
+        exam.passPercentage === null ? null : Number(exam.passPercentage),
+      scope: 'PUBLIC',
+      institutionId: null,
+    };
   }
 
-  private toInstitutionalExam(
-    exam: Omit<InstitutionalExam, 'scope'>,
-  ): InstitutionalExam {
-    return { ...exam, scope: 'INSTITUTIONAL' };
+  private toInstitutionalExam(exam: PrismaInstitutionExam): InstitutionalExam {
+    return {
+      ...exam,
+      passPercentage:
+        exam.passPercentage === null ? null : Number(exam.passPercentage),
+      scope: 'INSTITUTIONAL',
+    };
+  }
+
+  private withStableIds(questions: ScheduleExamInput['questions']) {
+    return questions.map((question) => {
+      const options = question.options.map((text) => ({
+        optionId: randomUUID(),
+        text,
+      }));
+      const correct = options.find(
+        (option) => option.text === question.correctAnswer,
+      );
+      return {
+        questionId: randomUUID(),
+        question: question.question,
+        options,
+        correctOptionIds: correct ? [correct.optionId] : [],
+        markValue: question.markValue,
+      };
+    });
   }
 }

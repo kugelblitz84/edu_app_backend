@@ -9,6 +9,7 @@ export interface AccessTokenSubject {
 export interface AuthenticatedUser extends AccessTokenSubject {
   sessionId: string;
   issuedAt: Date;
+  expiresAt: Date;
 }
 
 export interface AuthenticatedRequest extends Request {

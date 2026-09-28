@@ -17,7 +17,7 @@ describe('publicExamQuerySchema', () => {
         limit: '5',
         status: 'RUNNING',
         prefix: '  Math  ',
-        orderBy: 'examDate',
+        orderBy: 'startsAt',
         order: 'asc',
       }),
     ).toEqual({
@@ -25,7 +25,7 @@ describe('publicExamQuerySchema', () => {
       limit: 5,
       status: 'RUNNING',
       prefix: 'Math',
-      orderBy: 'examDate',
+      orderBy: 'startsAt',
       order: 'asc',
     });
   });

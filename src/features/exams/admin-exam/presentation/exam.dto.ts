@@ -40,11 +40,18 @@ export const examQuestionSchema = z
 
 export const scheduleExamSchema = z
   .object({
-    examDate: z.iso.datetime({ offset: true }),
+    startsAt: z.iso.datetime({ offset: true }),
+    closesAt: z.iso.datetime({ offset: true }),
     durationMinutes: z.number().int().positive(),
+    maxAttempts: z.number().int().min(1).default(1),
+    passPercentage: z.number().min(0).max(100).nullable().optional(),
     questions: z.array(examQuestionSchema).min(1).max(100),
   })
-  .strict();
+  .strict()
+  .refine((input) => new Date(input.startsAt) < new Date(input.closesAt), {
+    path: ['closesAt'],
+    message: 'closesAt must be later than startsAt.',
+  });
 
 export type CreateExamRequestDto = z.infer<typeof createExamSchema>;
 export type ScheduleExamRequestDto = z.infer<typeof scheduleExamSchema>;
@@ -53,7 +60,8 @@ export const updateExamMetadataSchema = z
   .object({
     name: z.string().trim().min(1).max(200).optional(),
     description: z.string().trim().min(1).max(1000).nullable().optional(),
-    examDate: z.iso.datetime({ offset: true }).nullable().optional(),
+    startsAt: z.iso.datetime({ offset: true }).nullable().optional(),
+    closesAt: z.iso.datetime({ offset: true }).nullable().optional(),
     durationMinutes: z
       .number()
       .int()
@@ -62,6 +70,8 @@ export const updateExamMetadataSchema = z
       .nullable()
       .optional(),
     accessMode: z.enum(['OPEN', 'INVITE_ONLY']).optional(),
+    maxAttempts: z.number().int().min(1).optional(),
+    passPercentage: z.number().min(0).max(100).nullable().optional(),
   })
   .strict()
   .refine((input) => Object.keys(input).length > 0, {
@@ -90,8 +100,12 @@ export interface ExamResponseDto {
   institutionId: string | null;
   name: string;
   description: string | null;
-  examDate: Date | null;
+  startsAt: Date | null;
+  closesAt: Date | null;
   durationMinutes: number | null;
+  maxAttempts: number;
+  passPercentage: number | null;
+  contentVersion: number;
   status: 'DRAFT' | 'SCHEDULED' | 'RUNNING' | 'COMPLETED' | 'CANCELLED';
   accessMode: 'OPEN' | 'INVITE_ONLY';
   createdByUserId: string;
@@ -100,17 +114,21 @@ export interface ExamResponseDto {
 }
 
 export interface GetExamsResponseDto {
-
-      id: string,
-      scope: 'PUBLIC' | 'INSTITUTIONAL',
-      accessMode: 'OPEN' | 'INVITE_ONLY',
-      status: 'DRAFT' | 'SCHEDULED' | 'RUNNING' | 'COMPLETED' | 'CANCELLED',
+  id: string;
+  scope: 'PUBLIC' | 'INSTITUTIONAL';
+  accessMode: 'OPEN' | 'INVITE_ONLY';
+  status: 'DRAFT' | 'SCHEDULED' | 'RUNNING' | 'COMPLETED' | 'CANCELLED';
 }
-
-
 
 export interface ExamContentResponseDto {
   examId: string;
+  version: number;
   totalQuestions: number;
-  questions: z.infer<typeof examQuestionSchema>[];
+  questions: {
+    questionId: string;
+    question: string;
+    options: { optionId: string; text: string }[];
+    correctOptionIds: string[];
+    markValue: number;
+  }[];
 }

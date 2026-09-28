@@ -1,0 +1,80 @@
+enum ExamAttemptScope {
+  PUBLIC
+  INSTITUTIONAL
+
+  @@map("exam_attempt_scope")
+}
+
+enum ExamAttemptStatus {
+  IN_PROGRESS
+  SUBMITTED
+  AUTO_SUBMITTED
+  GRADED
+  CANCELLED
+
+  @@map("exam_attempt_status")
+}
+
+model ExamAttempt {
+  id             String            @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId         String            @map("user_id") @db.Uuid
+  user           User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  examId         String            @map("exam_id") @db.Uuid
+  examScope      ExamAttemptScope  @map("exam_scope")
+  examName       String            @map("exam_name") @db.VarChar(200)
+  institutionId  String?           @map("institution_id") @db.Uuid
+  contentVersion Int               @map("content_version")
+  passPercentage Decimal?          @map("pass_percentage") @db.Decimal(5, 2)
+  attemptNumber  Int               @map("attempt_number")
+  status         ExamAttemptStatus @default(IN_PROGRESS)
+  startedAt      DateTime          @default(now()) @map("started_at") @db.Timestamptz
+  expiresAt      DateTime          @map("expires_at") @db.Timestamptz
+  submittedAt    DateTime?         @map("submitted_at") @db.Timestamptz
+  lastActivityAt DateTime          @default(now()) @map("last_activity_at") @db.Timestamptz
+  startedIp      String?           @map("started_ip") @db.VarChar(45)
+  userAgent      String?           @map("user_agent") @db.VarChar(512)
+  createdAt      DateTime          @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt      DateTime          @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
+  answers        ExamAttemptAnswer[]
+  result         ExamAttemptResult?
+
+  @@unique([userId, examId, examScope, attemptNumber])
+  @@index([userId, createdAt])
+  @@index([examId, examScope])
+  @@index([status, expiresAt])
+  @@map("exam_attempts")
+}
+
+model ExamAttemptAnswer {
+  id           String      @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  attemptId    String      @map("attempt_id") @db.Uuid
+  attempt      ExamAttempt @relation(fields: [attemptId], references: [id], onDelete: Cascade)
+  questionId   String      @map("question_id") @db.Uuid
+  answerData   Json        @map("answer_data")
+  revision     Int         @default(1)
+  isCorrect    Boolean?    @map("is_correct")
+  awardedMarks Decimal?    @map("awarded_marks") @db.Decimal(8, 2)
+  answeredAt   DateTime    @default(now()) @map("answered_at") @db.Timestamptz
+  updatedAt    DateTime    @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
+
+  @@unique([attemptId, questionId])
+  @@index([attemptId])
+  @@map("exam_attempt_answers")
+}
+
+model ExamAttemptResult {
+  id               String      @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  attemptId        String      @unique @map("attempt_id") @db.Uuid
+  attempt          ExamAttempt @relation(fields: [attemptId], references: [id], onDelete: Cascade)
+  score            Decimal     @db.Decimal(10, 2)
+  maximumScore     Decimal     @map("maximum_score") @db.Decimal(10, 2)
+  percentage       Decimal     @db.Decimal(5, 2)
+  passed           Boolean?
+  correctAnswers   Int         @map("correct_answers")
+  incorrectAnswers Int         @map("incorrect_answers")
+  unanswered       Int
+  gradedAt         DateTime    @default(now()) @map("graded_at") @db.Timestamptz
+
+  @@index([percentage])
+  @@map("exam_attempt_results")
+}

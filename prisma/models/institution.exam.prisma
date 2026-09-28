@@ -7,8 +7,12 @@ model InstitutionExam {
   institution     Institution    @relation(fields: [institutionId], references: [id], onDelete: Cascade, onUpdate: Cascade)
   name            String         @db.VarChar(200)
   description     String?        @db.VarChar(1000)
-  examDate        DateTime?      @map("exam_date") @db.Timestamptz
+  startsAt        DateTime?      @map("starts_at") @db.Timestamptz
+  closesAt        DateTime?      @map("closes_at") @db.Timestamptz
   durationMinutes Int?           @map("duration_minutes")
+  maxAttempts     Int            @default(1) @map("max_attempts")
+  passPercentage  Decimal?       @map("pass_percentage") @db.Decimal(5, 2)
+  contentVersion  Int            @default(0) @map("content_version")
   status          ExamStatus     @default(DRAFT)
   accessMode      ExamAccessMode @default(OPEN) @map("access_mode")
   createdByUserId String         @map("created_by_user_id") @db.Uuid
@@ -19,7 +23,8 @@ model InstitutionExam {
 
   @@index([institutionId])
   @@index([createdByUserId])
-  @@index([examDate])
+  @@index([startsAt])
+  @@index([closesAt])
   @@index([status])
   @@index([createdAt])
   @@map("institution_exams")

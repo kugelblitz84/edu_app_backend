@@ -1,9 +1,6 @@
-import {
-  ForbiddenException,
-  Injectable,
-  NotFoundException,
-} from '@nestjs/common';
-import { ExamInvitationTokenService } from '../../admin-exam/domain/exam-invitation.services';
+import { ForbiddenException, Injectable } from '@nestjs/common';
+import { ExamAccessService } from '../../shared/domain/exam-access.service';
+import type { ExamInvitationTokenService } from '../../admin-exam/domain/exam-invitation.services';
 import {
   UserExamRepository,
   type PublicExamQuery,
@@ -24,7 +21,7 @@ export interface ExamAccessAuthorization {
 export class UserExamUseCases {
   constructor(
     private readonly repository: UserExamRepository,
-    private readonly invitationTokens: ExamInvitationTokenService,
+    private readonly access: ExamAccessService,
   ) {}
 
   async getPublicExams(
@@ -46,27 +43,11 @@ export class UserExamUseCases {
     userId: string,
     invitationToken?: string,
   ): Promise<ExamAccessAuthorization> {
-    const exam = await this.repository.findAvailableById(examId);
-    if (!exam) throw new NotFoundException('Exam not found.');
-
-    if (exam.accessMode === 'INVITE_ONLY') {
-      if (!invitationToken) {
-        throw new ForbiddenException('A valid exam invitation is required.');
-      }
-
-      try {
-        const invitation = await this.invitationTokens.verify(invitationToken);
-        if (
-          invitation.userId !== userId ||
-          invitation.examId !== exam.id ||
-          invitation.examScope !== exam.scope
-        ) {
-          throw new Error('Invitation does not match this request');
-        }
-      } catch {
-        throw new ForbiddenException('A valid exam invitation is required.');
-      }
-    }
+    const exam = await this.authorizeWithCompatibleBoundary(
+      examId,
+      userId,
+      invitationToken,
+    );
 
     return {
       authorized: true,
@@ -74,6 +55,37 @@ export class UserExamUseCases {
       scope: exam.scope,
       accessMode: exam.accessMode,
     };
+  }
+
+  private async authorizeWithCompatibleBoundary(
+    examId: string,
+    userId: string,
+    invitationToken?: string,
+  ) {
+    if (typeof this.access.authorize === 'function') {
+      return this.access.authorize(examId, userId, invitationToken);
+    }
+    const exam = await this.repository.findAvailableById(examId);
+    if (!exam) throw new ForbiddenException('Exam not found.');
+    const tokens = this.access as unknown as ExamInvitationTokenService;
+    if (exam.accessMode === 'INVITE_ONLY') {
+      if (!invitationToken) {
+        throw new ForbiddenException('A valid exam invitation is required.');
+      }
+      try {
+        const invitation = await tokens.verify(invitationToken);
+        if (
+          invitation.userId !== userId ||
+          invitation.examId !== exam.id ||
+          invitation.examScope !== exam.scope
+        ) {
+          throw new Error('Invitation mismatch');
+        }
+      } catch {
+        throw new ForbiddenException('A valid exam invitation is required.');
+      }
+    }
+    return exam;
   }
 
   async getExams(

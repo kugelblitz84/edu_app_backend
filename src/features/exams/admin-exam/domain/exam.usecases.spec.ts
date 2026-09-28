@@ -9,8 +9,12 @@ const draft: InstitutionalExam = {
   institutionId: 'ed52b4d1-b69a-4705-bd3f-f946170a4813',
   name: 'Final',
   description: null,
-  examDate: null,
+  startsAt: null,
+  closesAt: null,
   durationMinutes: null,
+  maxAttempts: 1,
+  passPercentage: null,
+  contentVersion: 0,
   status: 'DRAFT',
   accessMode: 'OPEN',
   createdByUserId: '2f273fc1-674b-4763-972c-16a87eb8a616',
@@ -19,8 +23,10 @@ const draft: InstitutionalExam = {
 };
 
 const request = {
-  examDate: '2026-10-01T10:00:00.000Z',
+  startsAt: '2026-10-01T10:00:00.000Z',
+  closesAt: '2026-10-01T12:00:00.000Z',
   durationMinutes: 60,
+  maxAttempts: 1,
   questions: [
     {
       question: '2 + 2?',
@@ -33,14 +39,14 @@ const request = {
 
 function repositoryMock() {
   const findAccessibleById = jest.fn();
-  const upsertExamData = jest.fn();
+  const createExamDataVersion = jest.fn();
   const scheduleDraft = jest.fn();
   const updateMetadata = jest.fn();
   const updateContent = jest.fn();
   const repository: jest.Mocked<ExamRepository> = {
     createDraft: jest.fn(),
     findAccessibleById,
-    upsertExamData,
+    createExamDataVersion,
     scheduleDraft,
     updateMetadata,
     updateContent,
@@ -49,7 +55,7 @@ function repositoryMock() {
   return {
     repository,
     findAccessibleById,
-    upsertExamData,
+    createExamDataVersion,
     scheduleDraft,
     updateMetadata,
     updateContent,
@@ -59,10 +65,14 @@ function repositoryMock() {
 describe('ExamUseCases scheduling', () => {
   it('writes Mongo before transitioning PostgreSQL to SCHEDULED', async () => {
     const order: string[] = [];
-    const { repository, findAccessibleById, upsertExamData, scheduleDraft } =
-      repositoryMock();
+    const {
+      repository,
+      findAccessibleById,
+      createExamDataVersion,
+      scheduleDraft,
+    } = repositoryMock();
     findAccessibleById.mockResolvedValue(draft);
-    upsertExamData.mockImplementation(() => {
+    createExamDataVersion.mockImplementation(() => {
       order.push('mongo');
       return Promise.resolve();
     });
@@ -71,7 +81,8 @@ describe('ExamUseCases scheduling', () => {
       return Promise.resolve({
         ...draft,
         status: 'SCHEDULED',
-        examDate: new Date(request.examDate),
+        startsAt: new Date(request.startsAt),
+        closesAt: new Date(request.closesAt),
         durationMinutes: 60,
       });
     });
@@ -83,13 +94,21 @@ describe('ExamUseCases scheduling', () => {
     );
 
     expect(order).toEqual(['mongo', 'postgres']);
-    expect(upsertExamData).toHaveBeenCalledWith(draft.id, request.questions);
+    expect(createExamDataVersion).toHaveBeenCalledWith(
+      draft.id,
+      1,
+      request.questions,
+    );
     expect(result.status).toBe('SCHEDULED');
   });
 
   it('does not write Mongo when the exam is no longer DRAFT', async () => {
-    const { repository, findAccessibleById, upsertExamData, scheduleDraft } =
-      repositoryMock();
+    const {
+      repository,
+      findAccessibleById,
+      createExamDataVersion,
+      scheduleDraft,
+    } = repositoryMock();
     findAccessibleById.mockResolvedValue({
       ...draft,
       status: 'SCHEDULED',
@@ -102,21 +121,26 @@ describe('ExamUseCases scheduling', () => {
         request,
       ),
     ).rejects.toBeInstanceOf(ConflictException);
-    expect(upsertExamData).not.toHaveBeenCalled();
+    expect(createExamDataVersion).not.toHaveBeenCalled();
     expect(scheduleDraft).not.toHaveBeenCalled();
   });
 
   it('can retry the same request after PostgreSQL fails', async () => {
-    const { repository, findAccessibleById, upsertExamData, scheduleDraft } =
-      repositoryMock();
+    const {
+      repository,
+      findAccessibleById,
+      createExamDataVersion,
+      scheduleDraft,
+    } = repositoryMock();
     findAccessibleById.mockResolvedValue(draft);
-    upsertExamData.mockResolvedValue();
+    createExamDataVersion.mockResolvedValue();
     scheduleDraft
       .mockRejectedValueOnce(new Error('PostgreSQL unavailable'))
       .mockResolvedValueOnce({
         ...draft,
         status: 'SCHEDULED',
-        examDate: new Date(request.examDate),
+        startsAt: new Date(request.startsAt),
+        closesAt: new Date(request.closesAt),
         durationMinutes: 60,
       });
     const useCases = new ExamUseCases(repository);
@@ -128,15 +152,17 @@ describe('ExamUseCases scheduling', () => {
       useCases.schedule(draft.id, draft.createdByUserId, request),
     ).resolves.toMatchObject({ status: 'SCHEDULED' });
 
-    expect(upsertExamData).toHaveBeenCalledTimes(2);
-    expect(upsertExamData).toHaveBeenNthCalledWith(
+    expect(createExamDataVersion).toHaveBeenCalledTimes(2);
+    expect(createExamDataVersion).toHaveBeenNthCalledWith(
       1,
       draft.id,
+      1,
       request.questions,
     );
-    expect(upsertExamData).toHaveBeenNthCalledWith(
+    expect(createExamDataVersion).toHaveBeenNthCalledWith(
       2,
       draft.id,
+      1,
       request.questions,
     );
   });

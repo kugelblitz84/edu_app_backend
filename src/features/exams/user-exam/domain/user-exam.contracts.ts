@@ -32,7 +32,7 @@ export interface PublicExamQuery {
   limit: number;
   status?: PublicExamStatus;
   prefix?: string;
-  orderBy: 'name' | 'examDate' | 'createdAt';
+  orderBy: 'name' | 'startsAt' | 'createdAt';
   order: 'asc' | 'desc';
 }
 
@@ -40,7 +40,8 @@ export interface PublicExamListItem {
   id: string;
   name: string;
   description: string | null;
-  examDate: Date | null;
+  startsAt: Date | null;
+  closesAt: Date | null;
   durationMinutes: number | null;
   status: PublicExamStatus;
   accessMode: ExamAccessMode;
