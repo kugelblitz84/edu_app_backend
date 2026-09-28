@@ -10,6 +10,9 @@ export interface AppConfig {
   corsOrigins: string[];
   databaseUrl: string;
   mongodbUrl: string;
+  realtime: {
+    redisUrl?: string;
+  };
   auth: {
     accessTokenSecret: string;
     accessTokenTtlSeconds: number;
@@ -164,6 +167,16 @@ function loadMongodbUrl(value: string | undefined): string {
   return mongodbUrl;
 }
 
+function loadOptionalRedisUrl(value: string | undefined): string | undefined {
+  const redisUrl = value?.trim();
+  if (!redisUrl) return undefined;
+  const protocol = new URL(redisUrl).protocol;
+  if (protocol !== 'redis:' && protocol !== 'rediss:') {
+    throw new Error('REDIS_URL must use the redis or rediss protocol.');
+  }
+  return redisUrl;
+}
+
 export function loadAppConfig(): AppConfig {
   const nodeEnv = parseNodeEnvironment(process.env.NODE_ENV);
   const smtpHost = process.env.SMTP_HOST?.trim() || undefined;
@@ -199,6 +212,9 @@ export function loadAppConfig(): AppConfig {
     corsOrigins: parseCorsOrigins(process.env.CORS_ORIGINS),
     databaseUrl: loadDatabaseUrl(process.env.DATABASE_URL),
     mongodbUrl: loadMongodbUrl(process.env.MONGODB_URL),
+    realtime: {
+      redisUrl: loadOptionalRedisUrl(process.env.REDIS_URL),
+    },
     auth: {
       accessTokenSecret,
       accessTokenTtlSeconds: parsePositiveInteger(

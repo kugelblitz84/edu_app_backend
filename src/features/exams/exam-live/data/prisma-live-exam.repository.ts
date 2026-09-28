@@ -27,6 +27,9 @@ export class PrismaLiveExamRepository implements LiveExamRepository {
   ): Promise<AttemptRecord | null> {
     return this.prisma.$transaction(
       async (tx) => {
+        await tx.$queryRaw`SELECT pg_advisory_xact_lock(hashtext(${
+          'exam:' + exam.id
+        }))`;
         const lockKey = `${userId}:${exam.scope}:${exam.id}`;
         await tx.$queryRaw`SELECT pg_advisory_xact_lock(hashtext(${lockKey}))`;
         const active = await tx.examAttempt.findFirst({

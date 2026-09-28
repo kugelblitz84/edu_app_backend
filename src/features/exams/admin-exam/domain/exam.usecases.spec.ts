@@ -39,14 +39,12 @@ const request = {
 
 function repositoryMock() {
   const findAccessibleById = jest.fn();
-  const createExamDataVersion = jest.fn();
   const scheduleDraft = jest.fn();
   const updateMetadata = jest.fn();
   const updateContent = jest.fn();
   const repository: jest.Mocked<ExamRepository> = {
     createDraft: jest.fn(),
     findAccessibleById,
-    createExamDataVersion,
     scheduleDraft,
     updateMetadata,
     updateContent,
@@ -55,7 +53,6 @@ function repositoryMock() {
   return {
     repository,
     findAccessibleById,
-    createExamDataVersion,
     scheduleDraft,
     updateMetadata,
     updateContent,
@@ -63,28 +60,15 @@ function repositoryMock() {
 }
 
 describe('ExamUseCases scheduling', () => {
-  it('writes Mongo before transitioning PostgreSQL to SCHEDULED', async () => {
-    const order: string[] = [];
-    const {
-      repository,
-      findAccessibleById,
-      createExamDataVersion,
-      scheduleDraft,
-    } = repositoryMock();
+  it('delegates content and the schedule as one repository operation', async () => {
+    const { repository, findAccessibleById, scheduleDraft } = repositoryMock();
     findAccessibleById.mockResolvedValue(draft);
-    createExamDataVersion.mockImplementation(() => {
-      order.push('mongo');
-      return Promise.resolve();
-    });
-    scheduleDraft.mockImplementation(() => {
-      order.push('postgres');
-      return Promise.resolve({
-        ...draft,
-        status: 'SCHEDULED',
-        startsAt: new Date(request.startsAt),
-        closesAt: new Date(request.closesAt),
-        durationMinutes: 60,
-      });
+    scheduleDraft.mockResolvedValue({
+      ...draft,
+      status: 'SCHEDULED',
+      startsAt: new Date(request.startsAt),
+      closesAt: new Date(request.closesAt),
+      durationMinutes: 60,
     });
 
     const result = await new ExamUseCases(repository).schedule(
@@ -93,22 +77,22 @@ describe('ExamUseCases scheduling', () => {
       request,
     );
 
-    expect(order).toEqual(['mongo', 'postgres']);
-    expect(createExamDataVersion).toHaveBeenCalledWith(
+    expect(scheduleDraft).toHaveBeenCalledWith(
       draft.id,
-      1,
-      request.questions,
+      draft.scope,
+      draft.createdByUserId,
+      {
+        ...request,
+        startsAt: new Date(request.startsAt),
+        closesAt: new Date(request.closesAt),
+        contentVersion: 1,
+      },
     );
     expect(result.status).toBe('SCHEDULED');
   });
 
   it('does not write Mongo when the exam is no longer DRAFT', async () => {
-    const {
-      repository,
-      findAccessibleById,
-      createExamDataVersion,
-      scheduleDraft,
-    } = repositoryMock();
+    const { repository, findAccessibleById, scheduleDraft } = repositoryMock();
     findAccessibleById.mockResolvedValue({
       ...draft,
       status: 'SCHEDULED',
@@ -121,19 +105,12 @@ describe('ExamUseCases scheduling', () => {
         request,
       ),
     ).rejects.toBeInstanceOf(ConflictException);
-    expect(createExamDataVersion).not.toHaveBeenCalled();
     expect(scheduleDraft).not.toHaveBeenCalled();
   });
 
   it('can retry the same request after PostgreSQL fails', async () => {
-    const {
-      repository,
-      findAccessibleById,
-      createExamDataVersion,
-      scheduleDraft,
-    } = repositoryMock();
+    const { repository, findAccessibleById, scheduleDraft } = repositoryMock();
     findAccessibleById.mockResolvedValue(draft);
-    createExamDataVersion.mockResolvedValue();
     scheduleDraft
       .mockRejectedValueOnce(new Error('PostgreSQL unavailable'))
       .mockResolvedValueOnce({
@@ -152,19 +129,7 @@ describe('ExamUseCases scheduling', () => {
       useCases.schedule(draft.id, draft.createdByUserId, request),
     ).resolves.toMatchObject({ status: 'SCHEDULED' });
 
-    expect(createExamDataVersion).toHaveBeenCalledTimes(2);
-    expect(createExamDataVersion).toHaveBeenNthCalledWith(
-      1,
-      draft.id,
-      1,
-      request.questions,
-    );
-    expect(createExamDataVersion).toHaveBeenNthCalledWith(
-      2,
-      draft.id,
-      1,
-      request.questions,
-    );
+    expect(scheduleDraft).toHaveBeenCalledTimes(2);
   });
 });
 

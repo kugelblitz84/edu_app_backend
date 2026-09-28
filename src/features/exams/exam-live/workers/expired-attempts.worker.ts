@@ -1,10 +1,16 @@
-import { Injectable, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
+import {
+  Injectable,
+  Logger,
+  OnModuleDestroy,
+  OnModuleInit,
+} from '@nestjs/common';
 import { LiveExamRealtimePublisher } from '../domain/contracts/live-exam-realtime.publisher';
 import { LiveExamRepository } from '../domain/contracts/live-exam.repository';
 import { GradeAttemptUseCase } from '../domain/usecases/grade-attempt.usecase';
 
 @Injectable()
 export class ExpiredAttemptsWorker implements OnModuleInit, OnModuleDestroy {
+  private readonly logger = new Logger(ExpiredAttemptsWorker.name);
   private timer?: NodeJS.Timeout;
   private running = false;
 
@@ -15,7 +21,11 @@ export class ExpiredAttemptsWorker implements OnModuleInit, OnModuleDestroy {
   ) {}
 
   onModuleInit(): void {
-    this.timer = setInterval(() => void this.tick(), 10_000);
+    this.timer = setInterval(() => {
+      void this.tick().catch((error: unknown) => {
+        this.logger.error('Expired-attempt processing failed.', error);
+      });
+    }, 10_000);
     this.timer.unref();
   }
 
@@ -29,12 +39,23 @@ export class ExpiredAttemptsWorker implements OnModuleInit, OnModuleDestroy {
     try {
       const expired = await this.repository.claimExpired(new Date(), 100);
       for (const attempt of expired) {
-        this.realtime.attemptExpired(attempt.userId, attempt.id);
+        try {
+          this.realtime.attemptExpired(attempt.userId, attempt.id);
+        } catch (error) {
+          this.logger.warn(
+            `Failed to publish expiry for attempt ${attempt.id}.`,
+            error,
+          );
+        }
       }
       const pending = await this.repository.findPendingGrading(100);
       for (const attempt of pending) {
-        const result = await this.grader.execute(attempt.id);
-        if (result) this.realtime.attemptGraded(attempt.userId, attempt.id);
+        try {
+          const result = await this.grader.execute(attempt.id);
+          if (result) this.realtime.attemptGraded(attempt.userId, attempt.id);
+        } catch (error) {
+          this.logger.error(`Failed to grade attempt ${attempt.id}.`, error);
+        }
       }
     } finally {
       this.running = false;

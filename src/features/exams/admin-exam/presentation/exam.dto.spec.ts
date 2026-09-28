@@ -1,5 +1,6 @@
 import {
   createExamSchema,
+  scheduleExamSchema,
   updateExamContentSchema,
   updateExamMetadataSchema,
 } from './exam.dto';
@@ -20,6 +21,38 @@ describe('exam creation schema', () => {
         accessMode: 'INVITE_ONLY',
       }).success,
     ).toBe(true);
+  });
+});
+
+describe('exam scheduling schema', () => {
+  it('rejects expired and shorter-than-one-minute windows', () => {
+    const base = {
+      durationMinutes: 30,
+      maxAttempts: 1,
+      questions: [
+        {
+          question: '2 + 2?',
+          options: ['3', '4'],
+          correctAnswer: '4',
+        },
+      ],
+    };
+    expect(
+      scheduleExamSchema.safeParse({
+        ...base,
+        startsAt: '2020-01-01T00:00:00.000Z',
+        closesAt: '2020-01-01T01:00:00.000Z',
+      }).success,
+    ).toBe(false);
+
+    const startsAt = new Date(Date.now() + 3_600_000);
+    expect(
+      scheduleExamSchema.safeParse({
+        ...base,
+        startsAt: startsAt.toISOString(),
+        closesAt: new Date(startsAt.getTime() + 59_999).toISOString(),
+      }).success,
+    ).toBe(false);
   });
 });
 

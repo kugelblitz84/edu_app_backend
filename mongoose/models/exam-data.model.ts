@@ -36,6 +36,12 @@ export const examDataSchema = new mongoose.Schema(
       required: true,
     },
     version: { type: Number, required: true },
+    publicationId: { type: String, required: false },
+    publicationState: {
+      type: String,
+      enum: ['PENDING', 'PUBLISHED'],
+      required: false,
+    },
     totalQuestions: {
       type: Number,
       required: true,
@@ -67,6 +73,8 @@ export interface ExamQuestion {
 export interface ExamData {
   examId: string;
   version: number;
+  publicationId?: string;
+  publicationState?: 'PENDING' | 'PUBLISHED';
   totalQuestions: number;
   questions: ExamQuestion[];
 }

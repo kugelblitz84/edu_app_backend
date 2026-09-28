@@ -17,14 +17,14 @@ export class PrismaUserExamRepository implements UserExamRepository {
   constructor(private readonly prisma: PrismaService) {}
 
   async findPublicExams(query: PublicExamQuery): Promise<PublicExamPage> {
-    const publicStatuses = [
-      PrismaExamStatus.SCHEDULED,
-      PrismaExamStatus.RUNNING,
-      PrismaExamStatus.COMPLETED,
-    ];
+    const now = new Date();
+    const scheduleWhere = this.scheduleWhere(query.status, now);
     const where: Prisma.PersonalExamWhereInput = {
       deletedAt: null,
-      status: query.status ? query.status : { in: publicStatuses },
+      status: {
+        notIn: [PrismaExamStatus.DRAFT, PrismaExamStatus.CANCELLED],
+      },
+      ...scheduleWhere,
       ...(query.prefix
         ? { name: { startsWith: query.prefix, mode: 'insensitive' } }
         : {}),
@@ -56,33 +56,60 @@ export class PrismaUserExamRepository implements UserExamRepository {
     return {
       list: list.map((exam) => ({
         ...exam,
-        status: exam.status as PublicExamStatus,
+        status: this.displayStatus(exam.startsAt, exam.closesAt, now),
       })),
       total,
     };
   }
 
   async findAvailableById(id: string): Promise<AccessibleExam | null> {
-    const statuses = [PrismaExamStatus.SCHEDULED, PrismaExamStatus.RUNNING];
+    const now = new Date();
+    const visibleStatus = {
+      notIn: [PrismaExamStatus.DRAFT, PrismaExamStatus.CANCELLED],
+    };
     const [publicExam, institutionalExam] = await Promise.all([
       this.prisma.personalExam.findFirst({
-        where: { id, deletedAt: null, status: { in: statuses } },
-        select: { id: true, status: true, accessMode: true },
+        where: { id, deletedAt: null, status: visibleStatus },
+        select: {
+          id: true,
+          status: true,
+          accessMode: true,
+          startsAt: true,
+          closesAt: true,
+        },
       }),
       this.prisma.institutionExam.findFirst({
         where: {
           id,
           deletedAt: null,
-          status: { in: statuses },
+          status: visibleStatus,
           institution: { status: 'ACTIVE' },
         },
-        select: { id: true, status: true, accessMode: true },
+        select: {
+          id: true,
+          status: true,
+          accessMode: true,
+          startsAt: true,
+          closesAt: true,
+        },
       }),
     ]);
 
-    if (publicExam) return { ...publicExam, scope: 'PUBLIC' };
+    if (publicExam) {
+      const { startsAt, closesAt, ...result } = publicExam;
+      return {
+        ...result,
+        status: this.displayStatus(startsAt, closesAt, now),
+        scope: 'PUBLIC',
+      };
+    }
     if (institutionalExam) {
-      return { ...institutionalExam, scope: 'INSTITUTIONAL' };
+      const { startsAt, closesAt, ...result } = institutionalExam;
+      return {
+        ...result,
+        status: this.displayStatus(startsAt, closesAt, now),
+        scope: 'INSTITUTIONAL',
+      };
     }
     return null;
   }
@@ -108,13 +135,16 @@ export class PrismaUserExamRepository implements UserExamRepository {
     institutionId: string,
     query: InstitutionExamQuery,
   ): Promise<InstitutionExamPage> {
+    const now = new Date();
     const where: Prisma.InstitutionExamWhereInput = {
       institutionId,
       ...(query.id ? { id: query.id } : {}),
       deletedAt: null,
       status: {
-        in: [PrismaExamStatus.SCHEDULED, PrismaExamStatus.RUNNING],
+        notIn: [PrismaExamStatus.DRAFT, PrismaExamStatus.CANCELLED],
       },
+      startsAt: { not: null },
+      closesAt: { gt: now },
       institution: {
         status: 'ACTIVE',
       },
@@ -122,7 +152,13 @@ export class PrismaUserExamRepository implements UserExamRepository {
     const [exams, total] = await this.prisma.$transaction([
       this.prisma.institutionExam.findMany({
         where,
-        select: { id: true, status: true, accessMode: true },
+        select: {
+          id: true,
+          status: true,
+          accessMode: true,
+          startsAt: true,
+          closesAt: true,
+        },
         orderBy: [{ createdAt: 'desc' }, { id: 'asc' }],
         skip: (query.page - 1) * query.limit,
         take: query.limit,
@@ -131,8 +167,42 @@ export class PrismaUserExamRepository implements UserExamRepository {
     ]);
 
     return {
-      list: exams.map((exam) => ({ ...exam, scope: 'INSTITUTIONAL' })),
+      list: exams.map(({ startsAt, closesAt, ...exam }) => ({
+        ...exam,
+        status: this.displayStatus(startsAt, closesAt, now),
+        scope: 'INSTITUTIONAL',
+      })),
       total,
     };
+  }
+
+  private scheduleWhere(
+    status: PublicExamStatus | undefined,
+    now: Date,
+  ): Prisma.PersonalExamWhereInput {
+    if (status === 'SCHEDULED') {
+      return { startsAt: { gt: now }, closesAt: { gt: now } };
+    }
+    if (status === 'RUNNING') {
+      return { startsAt: { lte: now }, closesAt: { gt: now } };
+    }
+    if (status === 'COMPLETED') return { closesAt: { lte: now } };
+    return {
+      OR: [
+        { startsAt: { gt: now }, closesAt: { gt: now } },
+        { startsAt: { lte: now }, closesAt: { gt: now } },
+        { closesAt: { lte: now } },
+      ],
+    };
+  }
+
+  private displayStatus(
+    startsAt: Date | null,
+    closesAt: Date | null,
+    now: Date,
+  ): PublicExamStatus {
+    if (closesAt && closesAt <= now) return 'COMPLETED';
+    if (startsAt && startsAt <= now) return 'RUNNING';
+    return 'SCHEDULED';
   }
 }

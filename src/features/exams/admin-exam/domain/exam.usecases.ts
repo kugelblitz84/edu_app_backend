@@ -44,12 +44,6 @@ export class ExamUseCases {
     }
 
     const contentVersion = exam.contentVersion + 1;
-    await this.repository.createExamDataVersion(
-      id,
-      contentVersion,
-      input.questions,
-    );
-
     const scheduled = await this.repository.scheduleDraft(
       id,
       exam.scope,
@@ -60,6 +54,7 @@ export class ExamUseCases {
         durationMinutes: input.durationMinutes,
         maxAttempts: input.maxAttempts,
         passPercentage: input.passPercentage,
+        questions: input.questions,
         contentVersion,
       },
     );
@@ -89,7 +84,11 @@ export class ExamUseCases {
       userId,
       metadata,
     );
-    if (!updated) throw new NotFoundException('Exam not found.');
+    if (!updated) {
+      throw new ConflictException(
+        'The exam can no longer be edited because it started or has attempts.',
+      );
+    }
     return updated;
   }
 

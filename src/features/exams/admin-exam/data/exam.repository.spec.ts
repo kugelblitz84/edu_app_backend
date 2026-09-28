@@ -22,23 +22,68 @@ const exam = {
 
 function repositoryMock() {
   const personalFindFirst = jest.fn();
+  const personalCreate = jest.fn();
   const institutionFindFirst = jest.fn();
+  const institutionCreate = jest.fn();
+  const adminFindUnique = jest.fn();
   const userFindMany = jest.fn();
   const prisma = {
-    personalExam: { findFirst: personalFindFirst },
-    institutionExam: { findFirst: institutionFindFirst },
+    personalExam: { findFirst: personalFindFirst, create: personalCreate },
+    institutionExam: {
+      findFirst: institutionFindFirst,
+      create: institutionCreate,
+    },
+    institutionAdmin: { findUnique: adminFindUnique },
     user: { findMany: userFindMany },
   } as unknown as PrismaService;
 
   return {
     repository: new PrismaMongoExamRepository(prisma, {} as MongooseService),
     personalFindFirst,
+    personalCreate,
     institutionFindFirst,
+    institutionCreate,
+    adminFindUnique,
     userFindMany,
   };
 }
 
 describe(PrismaMongoExamRepository.name, () => {
+  it('persists invite-only access for public and institutional drafts', async () => {
+    const { repository, personalCreate, institutionCreate, adminFindUnique } =
+      repositoryMock();
+    personalCreate.mockResolvedValue({ ...exam, accessMode: 'INVITE_ONLY' });
+    adminFindUnique.mockResolvedValue({
+      institution: { status: 'ACTIVE' },
+    });
+    institutionCreate.mockResolvedValue({
+      ...exam,
+      institutionId: 'ed52b4d1-b69a-4705-bd3f-f946170a4813',
+      accessMode: 'INVITE_ONLY',
+    });
+
+    await repository.createDraft({
+      scope: 'PUBLIC',
+      name: exam.name,
+      createdByUserId: exam.createdByUserId,
+      accessMode: 'INVITE_ONLY',
+    });
+    await repository.createDraft({
+      scope: 'INSTITUTIONAL',
+      institutionId: 'ed52b4d1-b69a-4705-bd3f-f946170a4813',
+      name: exam.name,
+      createdByUserId: exam.createdByUserId,
+      accessMode: 'INVITE_ONLY',
+    });
+
+    expect(personalCreate).toHaveBeenCalledWith({
+      data: expect.objectContaining({ accessMode: 'INVITE_ONLY' }),
+    });
+    expect(institutionCreate).toHaveBeenCalledWith({
+      data: expect.objectContaining({ accessMode: 'INVITE_ONLY' }),
+    });
+  });
+
   it('only exposes a public exam to its author for editing', async () => {
     const { repository, personalFindFirst, institutionFindFirst } =
       repositoryMock();
@@ -106,5 +151,95 @@ describe(PrismaMongoExamRepository.name, () => {
       },
       select: { id: true, email: true },
     });
+  });
+
+  it('refuses metadata changes after the first attempt under the exam lock', async () => {
+    const updateMany = jest.fn();
+    const transaction = jest.fn().mockImplementation(async (callback) =>
+      callback({
+        $queryRaw: jest.fn(),
+        examAttempt: { count: jest.fn().mockResolvedValue(1) },
+        personalExam: { updateMany },
+      }),
+    );
+    const repository = new PrismaMongoExamRepository(
+      { $transaction: transaction } as unknown as PrismaService,
+      {} as MongooseService,
+    );
+
+    await expect(
+      repository.updateMetadata(exam.id, 'PUBLIC', exam.createdByUserId, {
+        maxAttempts: 2,
+      }),
+    ).resolves.toBeNull();
+
+    expect(updateMany).not.toHaveBeenCalled();
+  });
+
+  it('publishes the token-owned Mongo version selected by scheduling', async () => {
+    const mongoUpdate = jest.fn().mockReturnValue({
+      exec: jest.fn().mockResolvedValue({ matchedCount: 1 }),
+    });
+    const mongoCreate = jest.fn().mockImplementation((data) =>
+      Promise.resolve({
+        toObject: () => data,
+      }),
+    );
+    const model = {
+      deleteOne: jest.fn().mockReturnValue({
+        exec: jest.fn().mockResolvedValue({ deletedCount: 0 }),
+      }),
+      create: mongoCreate,
+      updateOne: mongoUpdate,
+    };
+    const scheduled = {
+      ...exam,
+      status: 'SCHEDULED',
+      startsAt: new Date('2030-01-01T10:00:00Z'),
+      closesAt: new Date('2030-01-01T12:00:00Z'),
+      durationMinutes: 60,
+      contentVersion: 1,
+    };
+    const tx = {
+      $queryRaw: jest.fn(),
+      personalExam: {
+        findFirst: jest.fn().mockResolvedValue(exam),
+        updateMany: jest.fn().mockResolvedValue({ count: 1 }),
+        findUnique: jest.fn().mockResolvedValue(scheduled),
+      },
+    };
+    const prisma = {
+      $transaction: jest.fn().mockImplementation((callback) => callback(tx)),
+    } as unknown as PrismaService;
+    const mongoose = {
+      connection: { models: { ExamData: model } },
+    } as unknown as MongooseService;
+    const repository = new PrismaMongoExamRepository(prisma, mongoose);
+
+    await expect(
+      repository.scheduleDraft(exam.id, 'PUBLIC', exam.createdByUserId, {
+        startsAt: scheduled.startsAt,
+        closesAt: scheduled.closesAt,
+        durationMinutes: 60,
+        maxAttempts: 1,
+        questions: [
+          {
+            question: '2 + 2?',
+            options: ['3', '4'],
+            correctAnswer: '4',
+            markValue: 1,
+          },
+        ],
+        contentVersion: 1,
+      }),
+    ).resolves.toMatchObject({ status: 'SCHEDULED', contentVersion: 1 });
+
+    const pending = mongoCreate.mock.calls[0][0] as {
+      publicationId: string;
+    };
+    expect(mongoUpdate).toHaveBeenCalledWith(
+      expect.objectContaining({ publicationId: pending.publicationId }),
+      { $set: { publicationState: 'PUBLISHED' } },
+    );
   });
 });

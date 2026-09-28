@@ -2,6 +2,11 @@ import type { PrismaService } from '../../../../core/database/prisma.service';
 import { PrismaUserExamRepository } from './user-exam.repository';
 
 describe(PrismaUserExamRepository.name, () => {
+  const now = new Date('2026-09-29T00:00:00.000Z');
+
+  beforeEach(() => jest.useFakeTimers().setSystemTime(now));
+  afterEach(() => jest.useRealTimers());
+
   it('applies public filters, stable ordering, and pagination', async () => {
     const findMany = jest.fn().mockResolvedValue([]);
     const count = jest.fn().mockResolvedValue(0);
@@ -30,7 +35,9 @@ describe(PrismaUserExamRepository.name, () => {
     expect(findMany).toHaveBeenCalledWith({
       where: {
         deletedAt: null,
-        status: 'RUNNING',
+        status: { notIn: ['DRAFT', 'CANCELLED'] },
+        startsAt: { lte: now },
+        closesAt: { gt: now },
         name: { startsWith: 'Math', mode: 'insensitive' },
       },
       select: {
@@ -52,7 +59,9 @@ describe(PrismaUserExamRepository.name, () => {
     expect(count).toHaveBeenCalledWith({
       where: {
         deletedAt: null,
-        status: 'RUNNING',
+        status: { notIn: ['DRAFT', 'CANCELLED'] },
+        startsAt: { lte: now },
+        closesAt: { gt: now },
         name: { startsWith: 'Math', mode: 'insensitive' },
       },
     });
@@ -64,6 +73,8 @@ describe(PrismaUserExamRepository.name, () => {
       id: '8dc198a1-1b0f-4fc1-914d-319917301f3e',
       status: 'SCHEDULED',
       accessMode: 'OPEN',
+      startsAt: new Date('2026-10-01T00:00:00.000Z'),
+      closesAt: new Date('2026-10-02T00:00:00.000Z'),
     };
     const findMany = jest.fn().mockResolvedValue([exam]);
     const count = jest.fn().mockResolvedValue(21);
@@ -84,7 +95,14 @@ describe(PrismaUserExamRepository.name, () => {
         limit: 10,
       }),
     ).resolves.toEqual({
-      list: [{ ...exam, scope: 'INSTITUTIONAL' }],
+      list: [
+        {
+          id: exam.id,
+          status: 'SCHEDULED',
+          accessMode: exam.accessMode,
+          scope: 'INSTITUTIONAL',
+        },
+      ],
       total: 21,
     });
 
@@ -95,7 +113,9 @@ describe(PrismaUserExamRepository.name, () => {
       where: {
         institutionId: '1030af05-ed3a-4327-8c99-17acc15f2eb6',
         deletedAt: null,
-        status: { in: ['SCHEDULED', 'RUNNING'] },
+        status: { notIn: ['DRAFT', 'CANCELLED'] },
+        startsAt: { not: null },
+        closesAt: { gt: now },
         institution: {
           status: 'ACTIVE',
         },

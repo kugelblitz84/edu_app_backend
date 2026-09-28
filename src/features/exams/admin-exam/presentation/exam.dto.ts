@@ -1,5 +1,7 @@
 import { z } from 'zod';
 
+export const MINIMUM_EXAM_WINDOW_MS = 60_000;
+
 const createExamBaseSchema = z.object({
   name: z.string().trim().min(1).max(200),
   description: z.string().trim().min(1).max(1000).optional(),
@@ -48,9 +50,23 @@ export const scheduleExamSchema = z
     questions: z.array(examQuestionSchema).min(1).max(100),
   })
   .strict()
-  .refine((input) => new Date(input.startsAt) < new Date(input.closesAt), {
-    path: ['closesAt'],
-    message: 'closesAt must be later than startsAt.',
+  .superRefine((input, context) => {
+    const startsAt = new Date(input.startsAt);
+    const closesAt = new Date(input.closesAt);
+    if (closesAt.getTime() - startsAt.getTime() < MINIMUM_EXAM_WINDOW_MS) {
+      context.addIssue({
+        code: 'custom',
+        path: ['closesAt'],
+        message: 'The exam window must be at least one minute.',
+      });
+    }
+    if (closesAt.getTime() - Date.now() < MINIMUM_EXAM_WINDOW_MS) {
+      context.addIssue({
+        code: 'custom',
+        path: ['closesAt'],
+        message: 'closesAt must leave at least one minute to take the exam.',
+      });
+    }
   });
 
 export type CreateExamRequestDto = z.infer<typeof createExamSchema>;

@@ -57,4 +57,27 @@ describe(ExamAccessService.name, () => {
       ),
     ).rejects.toBeInstanceOf(ForbiddenException);
   });
+
+  it('requires a matching invitation for invite-only exams', async () => {
+    const inviteOnly = { ...exam, accessMode: 'INVITE_ONLY' as const };
+    const repository = {
+      findExamForAccess: jest.fn().mockResolvedValue(inviteOnly),
+      hasActiveEnrollment: jest.fn().mockResolvedValue(true),
+    } as unknown as ExamAccessRepository;
+    const tokens = {
+      verify: jest.fn().mockResolvedValue({
+        userId: 'user-id',
+        examId: exam.id,
+        examScope: exam.scope,
+      }),
+    } as unknown as ExamInvitationTokenService;
+    const service = new ExamAccessService(repository, tokens);
+
+    await expect(
+      service.authorize(exam.id, 'user-id', undefined, now),
+    ).rejects.toBeInstanceOf(ForbiddenException);
+    await expect(
+      service.authorize(exam.id, 'user-id', 'valid-token', now),
+    ).resolves.toMatchObject({ accessMode: 'INVITE_ONLY' });
+  });
 });
