@@ -31,6 +31,8 @@ model User {
   createdAt         DateTime     @default(now()) @map("created_at") @db.Timestamptz
   updatedAt         DateTime     @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
   deletedAt         DateTime?    @map("deleted_at") @db.Timestamptz
+  enrollments Enrollment[]
+
 
   passwordResets        PasswordReset[]
   createdInstitutions   Institution[]

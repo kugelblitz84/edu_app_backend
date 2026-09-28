@@ -99,6 +99,16 @@ export interface ExamResponseDto {
   updatedAt: Date;
 }
 
+export interface GetExamsResponseDto {
+
+      id: string,
+      scope: 'PUBLIC' | 'INSTITUTIONAL',
+      accessMode: 'OPEN' | 'INVITE_ONLY',
+      status: 'DRAFT' | 'SCHEDULED' | 'RUNNING' | 'COMPLETED' | 'CANCELLED',
+}
+
+
+
 export interface ExamContentResponseDto {
   examId: string;
   totalQuestions: number;

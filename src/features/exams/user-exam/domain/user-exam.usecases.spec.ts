@@ -13,14 +13,23 @@ const userId = '2f273fc1-674b-4763-972c-16a87eb8a616';
 
 function useCasesMock() {
   const findAvailableById = jest.fn();
+  const hasActiveEnrollment = jest.fn();
+  const findInstitutionExams = jest.fn();
+  const findPublicExams = jest.fn();
   const verify = jest.fn();
   const repository = {
     findAvailableById,
+    hasActiveEnrollment,
+    findInstitutionExams,
+    findPublicExams,
   } as unknown as UserExamRepository;
   const tokens = { verify } as unknown as ExamInvitationTokenService;
   return {
     useCases: new UserExamUseCases(repository, tokens),
     findAvailableById,
+    hasActiveEnrollment,
+    findInstitutionExams,
+    findPublicExams,
     verify,
   };
 }
@@ -62,5 +71,76 @@ describe(UserExamUseCases.name, () => {
     await expect(
       useCases.authorizeAccess(exam.id, userId, 'invitation-token'),
     ).rejects.toBeInstanceOf(ForbiddenException);
+  });
+
+  it('returns institution exams for an actively enrolled user', async () => {
+    const { useCases, hasActiveEnrollment, findInstitutionExams } =
+      useCasesMock();
+    const institutionId = '1030af05-ed3a-4327-8c99-17acc15f2eb6';
+    const institutionExam = { ...exam, scope: 'INSTITUTIONAL' as const };
+    hasActiveEnrollment.mockResolvedValue(true);
+    findInstitutionExams.mockResolvedValue({
+      list: [institutionExam],
+      total: 12,
+    });
+
+    await expect(
+      useCases.getExams(institutionId, userId, { page: 1, limit: 10 }),
+    ).resolves.toEqual({
+      list: [institutionExam],
+      page: 1,
+      limit: 10,
+      total: 12,
+      totalPages: 2,
+    });
+    expect(findInstitutionExams).toHaveBeenCalledWith(institutionId, {
+      page: 1,
+      limit: 10,
+    });
+  });
+
+  it('rejects a user who is not actively enrolled', async () => {
+    const { useCases, hasActiveEnrollment, findInstitutionExams } =
+      useCasesMock();
+    const institutionId = '1030af05-ed3a-4327-8c99-17acc15f2eb6';
+    hasActiveEnrollment.mockResolvedValue(false);
+
+    await expect(
+      useCases.getExams(institutionId, userId, { page: 1, limit: 10 }),
+    ).rejects.toBeInstanceOf(ForbiddenException);
+    expect(findInstitutionExams).not.toHaveBeenCalled();
+  });
+
+  it('returns public exams with pagination metadata', async () => {
+    const { useCases, findPublicExams } = useCasesMock();
+    const query = {
+      page: 2,
+      limit: 5,
+      status: 'RUNNING' as const,
+      prefix: 'Math',
+      orderBy: 'name' as const,
+      order: 'asc' as const,
+    };
+    const publicExam = {
+      id: exam.id,
+      name: 'Mathematics Final',
+      description: null,
+      examDate: new Date('2026-10-01T10:00:00Z'),
+      durationMinutes: 60,
+      status: 'RUNNING' as const,
+      accessMode: 'OPEN' as const,
+      createdAt: new Date('2026-09-01T10:00:00Z'),
+      updatedAt: new Date('2026-09-02T10:00:00Z'),
+    };
+    findPublicExams.mockResolvedValue({ list: [publicExam], total: 12 });
+
+    await expect(useCases.getPublicExams(query)).resolves.toEqual({
+      list: [publicExam],
+      page: 2,
+      limit: 5,
+      total: 12,
+      totalPages: 3,
+    });
+    expect(findPublicExams).toHaveBeenCalledWith(query);
   });
 });

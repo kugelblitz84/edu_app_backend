@@ -85,4 +85,5 @@ export class AdminExamController {
   ): Promise<GenerateExamInvitationsResponseDto> {
     return this.invitations.generate(id, currentUser.userId, input);
   }
+  
 }
