@@ -19,78 +19,192 @@ import type {
 export class PrismaLiveExamRepository implements LiveExamRepository {
   constructor(private readonly prisma: PrismaService) {}
 
-  startOrResume(
+  async startOrResume(
     exam: AccessibleExam,
     userId: string,
-    now: Date,
     metadata: AttemptMetadata,
   ): Promise<AttemptRecord | null> {
-    return this.prisma.$transaction(
-      async (tx) => {
-        await tx.$queryRaw`SELECT pg_advisory_xact_lock(hashtext(${
-          'exam:' + exam.id
-        }))`;
-        const lockKey = `${userId}:${exam.scope}:${exam.id}`;
-        await tx.$queryRaw`SELECT pg_advisory_xact_lock(hashtext(${lockKey}))`;
-        const active = await tx.examAttempt.findFirst({
-          where: {
-            userId,
-            examId: exam.id,
-            examScope: exam.scope,
-            status: 'IN_PROGRESS',
-            expiresAt: { gt: now },
-          },
-          orderBy: { attemptNumber: 'desc' },
-        });
-        if (active) return this.toAttempt(active);
-
-        await tx.examAttempt.updateMany({
-          where: {
-            userId,
-            examId: exam.id,
-            examScope: exam.scope,
-            status: 'IN_PROGRESS',
-            expiresAt: { lte: now },
-          },
-          data: { status: 'AUTO_SUBMITTED', submittedAt: now },
-        });
-        const used = await tx.examAttempt.count({
-          where: {
-            userId,
-            examId: exam.id,
-            examScope: exam.scope,
-            status: { not: 'CANCELLED' },
-          },
-        });
-        if (used >= exam.maxAttempts) return null;
-        const durationEnd = new Date(
-          now.getTime() + (exam.durationMinutes ?? 0) * 60_000,
+    for (let attempt = 1; attempt <= 3; attempt += 1) {
+      try {
+        return await this.prisma.$transaction(
+          (tx) => this.startOrResumeLocked(tx, exam, userId, metadata),
+          { isolationLevel: 'ReadCommitted' },
         );
-        const expiresAt =
-          exam.closesAt && exam.closesAt < durationEnd
-            ? exam.closesAt
-            : durationEnd;
-        const created = await tx.examAttempt.create({
-          data: {
-            userId,
-            examId: exam.id,
-            examScope: exam.scope,
-            examName: exam.name,
+      } catch (error) {
+        if (attempt === 3 || !this.isRetryableTransactionError(error)) {
+          throw error;
+        }
+      }
+    }
+    return null;
+  }
+
+  private async startOrResumeLocked(
+    tx: Prisma.TransactionClient,
+    authorizedExam: AccessibleExam,
+    userId: string,
+    metadata: AttemptMetadata,
+  ): Promise<AttemptRecord | null> {
+    await tx.$queryRaw`SELECT pg_advisory_xact_lock(hashtext(${
+      'exam:' + authorizedExam.id
+    })) IS NULL AS locked`;
+    const lockKey = `${userId}:${authorizedExam.scope}:${authorizedExam.id}`;
+    await tx.$queryRaw`SELECT pg_advisory_xact_lock(hashtext(${lockKey})) IS NULL AS locked`;
+
+    const [{ now }] = await tx.$queryRaw<{ now: Date }[]>`
+      SELECT clock_timestamp() AS now
+    `;
+    const select = {
+      id: true,
+      name: true,
+      accessMode: true,
+      startsAt: true,
+      closesAt: true,
+      durationMinutes: true,
+      maxAttempts: true,
+      passPercentage: true,
+      contentVersion: true,
+      status: true,
+    } as const;
+    let exam: AccessibleExam | null;
+    if (authorizedExam.scope === 'PUBLIC') {
+      const current = await tx.personalExam.findFirst({
+        where: { id: authorizedExam.id, deletedAt: null },
+        select,
+      });
+      exam = current
+        ? {
+            ...current,
+            scope: 'PUBLIC',
+            institutionId: null,
+            passPercentage:
+              current.passPercentage === null
+                ? null
+                : Number(current.passPercentage),
+          }
+        : null;
+    } else {
+      const current = await tx.institutionExam.findFirst({
+        where: {
+          id: authorizedExam.id,
+          deletedAt: null,
+          institution: { status: 'ACTIVE' },
+        },
+        select: { ...select, institutionId: true },
+      });
+      exam = current
+        ? {
+            ...current,
+            scope: 'INSTITUTIONAL',
+            passPercentage:
+              current.passPercentage === null
+                ? null
+                : Number(current.passPercentage),
+          }
+        : null;
+    }
+
+    const transactionNow = new Date(now);
+    if (
+      !exam ||
+      !['SCHEDULED', 'RUNNING'].includes(exam.status) ||
+      !exam.startsAt ||
+      !exam.closesAt ||
+      !exam.durationMinutes ||
+      exam.contentVersion < 1 ||
+      transactionNow < exam.startsAt ||
+      transactionNow >= exam.closesAt ||
+      (exam.accessMode === 'INVITE_ONLY' &&
+        authorizedExam.accessMode !== 'INVITE_ONLY')
+    ) {
+      return null;
+    }
+    if (exam.scope === 'INSTITUTIONAL') {
+      if (!exam.institutionId) return null;
+      const enrollment = await tx.enrollment.findUnique({
+        where: {
+          institutionId_userId: {
             institutionId: exam.institutionId,
-            contentVersion: exam.contentVersion,
-            passPercentage: exam.passPercentage,
-            attemptNumber: used + 1,
-            startedAt: now,
-            expiresAt,
-            lastActivityAt: now,
-            startedIp: metadata.ipAddress?.slice(0, 45),
-            userAgent: metadata.userAgent?.slice(0, 512),
+            userId,
           },
-        });
-        return this.toAttempt(created);
+        },
+        select: { status: true, expiresAt: true },
+      });
+      if (
+        enrollment?.status !== 'ACTIVE' ||
+        (enrollment.expiresAt !== null &&
+          enrollment.expiresAt <= transactionNow)
+      ) {
+        return null;
+      }
+    }
+
+    const active = await tx.examAttempt.findFirst({
+      where: {
+        userId,
+        examId: exam.id,
+        examScope: exam.scope,
+        status: 'IN_PROGRESS',
+        expiresAt: { gt: transactionNow },
       },
-      { isolationLevel: 'Serializable' },
+      orderBy: { attemptNumber: 'desc' },
+    });
+    if (active) return this.toAttempt(active);
+
+    await tx.examAttempt.updateMany({
+      where: {
+        userId,
+        examId: exam.id,
+        examScope: exam.scope,
+        status: 'IN_PROGRESS',
+        expiresAt: { lte: transactionNow },
+      },
+      data: { status: 'AUTO_SUBMITTED', submittedAt: transactionNow },
+    });
+    const used = await tx.examAttempt.count({
+      where: {
+        userId,
+        examId: exam.id,
+        examScope: exam.scope,
+        status: { not: 'CANCELLED' },
+      },
+    });
+    if (used >= exam.maxAttempts) return null;
+
+    const durationEnd = new Date(
+      transactionNow.getTime() + exam.durationMinutes * 60_000,
     );
+    const expiresAt = exam.closesAt < durationEnd ? exam.closesAt : durationEnd;
+    const created = await tx.examAttempt.create({
+      data: {
+        userId,
+        examId: exam.id,
+        examScope: exam.scope,
+        examName: exam.name,
+        institutionId: exam.institutionId,
+        contentVersion: exam.contentVersion,
+        passPercentage: exam.passPercentage,
+        attemptNumber: used + 1,
+        startedAt: transactionNow,
+        expiresAt,
+        lastActivityAt: transactionNow,
+        startedIp: metadata.ipAddress?.slice(0, 45),
+        userAgent: metadata.userAgent?.slice(0, 512),
+      },
+    });
+    return this.toAttempt(created);
+  }
+
+  private isRetryableTransactionError(error: unknown): boolean {
+    if (!error || typeof error !== 'object') return false;
+    const candidate = error as { code?: unknown; cause?: unknown };
+    if (
+      typeof candidate.code === 'string' &&
+      ['P2034', '40001', '40P01'].includes(candidate.code)
+    ) {
+      return true;
+    }
+    return this.isRetryableTransactionError(candidate.cause);
   }
 
   async findOwned(

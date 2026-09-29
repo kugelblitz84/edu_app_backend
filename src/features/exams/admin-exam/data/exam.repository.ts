@@ -119,7 +119,7 @@ export class PrismaMongoExamRepository implements ExamRepository {
     };
     const publicationId = randomUUID();
     const scheduled = await this.prisma.$transaction(async (tx) => {
-      await tx.$queryRaw`SELECT pg_advisory_xact_lock(hashtext(${'exam:' + id}))`;
+      await tx.$queryRaw`SELECT pg_advisory_xact_lock(hashtext(${'exam:' + id})) IS NULL AS locked`;
       const where = {
         ...this.editableWhere(id, scope, userId),
         status: PrismaExamStatus.DRAFT,
@@ -173,16 +173,28 @@ export class PrismaMongoExamRepository implements ExamRepository {
     input: UpdateExamMetadataInput,
   ): Promise<Exam | null> {
     return this.prisma.$transaction(async (tx) => {
-      await tx.$queryRaw`SELECT pg_advisory_xact_lock(hashtext(${'exam:' + id}))`;
+      await tx.$queryRaw`SELECT pg_advisory_xact_lock(hashtext(${'exam:' + id})) IS NULL AS locked`;
+      const now = new Date();
+      const editableWhere = {
+        ...this.editableWhere(id, scope, userId),
+        status: { in: [PrismaExamStatus.DRAFT, PrismaExamStatus.SCHEDULED] },
+        OR: [{ startsAt: null }, { startsAt: { gt: now } }],
+      };
+      const current =
+        scope === 'PUBLIC'
+          ? await tx.personalExam.findFirst({ where: editableWhere })
+          : await tx.institutionExam.findFirst({ where: editableWhere });
+      if (!current || !this.isValidMetadataResult(current, input, now)) {
+        return null;
+      }
       const attempts = await tx.examAttempt.count({
         where: { examId: id, examScope: scope },
       });
       if (attempts > 0) return null;
 
       const where = {
-        ...this.editableWhere(id, scope, userId),
-        status: { in: [PrismaExamStatus.DRAFT, PrismaExamStatus.SCHEDULED] },
-        OR: [{ startsAt: null }, { startsAt: { gt: new Date() } }],
+        ...editableWhere,
+        contentVersion: current.contentVersion,
       };
       if (scope === 'PUBLIC') {
         const result = await tx.personalExam.updateMany({ where, data: input });
@@ -211,7 +223,7 @@ export class PrismaMongoExamRepository implements ExamRepository {
     const updated = await this.prisma.$transaction(async (tx) => {
       await tx.$queryRaw`SELECT pg_advisory_xact_lock(hashtext(${
         'exam:' + examId
-      }))`;
+      })) IS NULL AS locked`;
       const timeWhere = {
         id: examId,
         deletedAt: null,
@@ -386,6 +398,32 @@ export class PrismaMongoExamRepository implements ExamRepository {
     if (closesAt && closesAt <= now) return 'COMPLETED';
     if (startsAt && startsAt <= now) return 'RUNNING';
     return 'SCHEDULED';
+  }
+
+  private isValidMetadataResult(
+    current: PrismaPersonalExam | PrismaInstitutionExam,
+    input: UpdateExamMetadataInput,
+    now: Date,
+  ): boolean {
+    if (current.status === PrismaExamStatus.DRAFT) return true;
+
+    const startsAt =
+      input.startsAt === undefined ? current.startsAt : input.startsAt;
+    const closesAt =
+      input.closesAt === undefined ? current.closesAt : input.closesAt;
+    const durationMinutes =
+      input.durationMinutes === undefined
+        ? current.durationMinutes
+        : input.durationMinutes;
+
+    return Boolean(
+      startsAt &&
+      closesAt &&
+      durationMinutes &&
+      startsAt > now &&
+      closesAt.getTime() - startsAt.getTime() >= MINIMUM_EXAM_WINDOW_MS &&
+      closesAt.getTime() - now.getTime() >= MINIMUM_EXAM_WINDOW_MS,
+    );
   }
 
   private withStableIds(questions: ScheduleExamInput['questions']) {

@@ -159,7 +159,10 @@ describe(PrismaMongoExamRepository.name, () => {
       callback({
         $queryRaw: jest.fn(),
         examAttempt: { count: jest.fn().mockResolvedValue(1) },
-        personalExam: { updateMany },
+        personalExam: {
+          findFirst: jest.fn().mockResolvedValue(exam),
+          updateMany,
+        },
       }),
     );
     const repository = new PrismaMongoExamRepository(
@@ -174,6 +177,47 @@ describe(PrismaMongoExamRepository.name, () => {
     ).resolves.toBeNull();
 
     expect(updateMany).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    [{ closesAt: null }, 'a null closing time'],
+    [{ durationMinutes: null }, 'a null duration'],
+    [
+      { closesAt: new Date('2030-01-01T09:00:00Z') },
+      'a closing time before the start',
+    ],
+  ])('rejects scheduled metadata resulting in %s', async (input) => {
+    jest.useFakeTimers().setSystemTime(new Date('2029-01-01T00:00:00Z'));
+    const scheduledExam = {
+      ...exam,
+      status: 'SCHEDULED' as const,
+      startsAt: new Date('2030-01-01T10:00:00Z'),
+      closesAt: new Date('2030-01-01T12:00:00Z'),
+      durationMinutes: 60,
+      contentVersion: 1,
+    };
+    const updateMany = jest.fn();
+    const tx = {
+      $queryRaw: jest.fn(),
+      personalExam: {
+        findFirst: jest.fn().mockResolvedValue(scheduledExam),
+        updateMany,
+      },
+      examAttempt: { count: jest.fn().mockResolvedValue(0) },
+    };
+    const prisma = {
+      $transaction: jest.fn().mockImplementation((callback) => callback(tx)),
+    } as unknown as PrismaService;
+    const repository = new PrismaMongoExamRepository(
+      prisma,
+      {} as MongooseService,
+    );
+
+    await expect(
+      repository.updateMetadata(exam.id, 'PUBLIC', exam.createdByUserId, input),
+    ).resolves.toBeNull();
+    expect(updateMany).not.toHaveBeenCalled();
+    jest.useRealTimers();
   });
 
   it('publishes the token-owned Mongo version selected by scheduling', async () => {

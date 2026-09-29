@@ -8,6 +8,7 @@ import { PrismaService } from '../../src/core/database/prisma.service';
 import { AuthModule } from '../../src/features/auth/auth.module';
 import type { AuthTokenPair } from '../../src/core/auth/auth.types';
 import { SessionService } from '../../src/core/auth/services/session.service';
+import { RateLimitService } from '../../src/core/auth/services/rate-limit.service';
 import { LoginUserRepository } from '../../src/features/auth/login/domain/contracts/login-user.repository';
 import type { LoginUserRecord } from '../../src/features/auth/login/domain/contracts/types';
 import type { LoginResponseDto } from '../../src/features/auth/login/presentation/login.dto';
@@ -146,6 +147,8 @@ describe('Auth module (e2e)', () => {
     })
       .overrideProvider(PrismaService)
       .useValue({})
+      .overrideProvider(RateLimitService)
+      .useValue({ enforce: jest.fn().mockResolvedValue(undefined) })
       .overrideProvider(RegisterUserRepository)
       .useValue(repository)
       .overrideProvider(LoginUserRepository)

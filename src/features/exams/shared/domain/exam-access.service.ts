@@ -25,7 +25,7 @@ export class ExamAccessService {
     const exam = await this.repository.findExamForAccess(examId);
     if (!exam) throw new NotFoundException('Exam not found.');
     if (
-      exam.status === 'CANCELLED' ||
+      !['SCHEDULED', 'RUNNING'].includes(exam.status) ||
       !exam.startsAt ||
       !exam.closesAt ||
       !exam.durationMinutes ||

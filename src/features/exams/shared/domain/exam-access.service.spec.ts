@@ -20,6 +20,27 @@ const exam = {
 };
 
 describe(ExamAccessService.name, () => {
+  it('rejects a draft even when it has content and a live time window', async () => {
+    const repository = {
+      findExamForAccess: jest
+        .fn()
+        .mockResolvedValue({ ...exam, status: 'DRAFT' }),
+      hasActiveEnrollment: jest.fn().mockResolvedValue(true),
+    } as unknown as ExamAccessRepository;
+    const tokens = {
+      verify: jest.fn(),
+    } as unknown as ExamInvitationTokenService;
+
+    await expect(
+      new ExamAccessService(repository, tokens).authorize(
+        exam.id,
+        'user-id',
+        undefined,
+        now,
+      ),
+    ).rejects.toBeInstanceOf(ForbiddenException);
+  });
+
   it('rejects an institutional candidate without active enrollment', async () => {
     const repository = {
       findExamForAccess: jest.fn().mockResolvedValue(exam),

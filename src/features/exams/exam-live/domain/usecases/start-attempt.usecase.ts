@@ -31,12 +31,7 @@ export class StartAttemptUseCase {
       invitationToken,
       now,
     );
-    const attempt = await this.repository.startOrResume(
-      exam,
-      userId,
-      now,
-      metadata,
-    );
+    const attempt = await this.repository.startOrResume(exam, userId, metadata);
     if (!attempt) {
       throw new ConflictException(
         'The maximum number of attempts was reached.',
@@ -49,6 +44,6 @@ export class StartAttemptUseCase {
     if (!questions) {
       throw new ServiceUnavailableException('Exam content is unavailable.');
     }
-    return { attempt, questions, serverTime: now };
+    return { attempt, questions, serverTime: attempt.startedAt };
   }
 }

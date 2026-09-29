@@ -30,7 +30,6 @@ export abstract class LiveExamRepository {
   abstract startOrResume(
     exam: AccessibleExam,
     userId: string,
-    now: Date,
     metadata: AttemptMetadata,
   ): Promise<AttemptRecord | null>;
   abstract findOwned(
