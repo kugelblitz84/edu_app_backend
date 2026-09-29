@@ -101,4 +101,90 @@ describe(ExamAccessService.name, () => {
       service.authorize(exam.id, 'user-id', 'valid-token', now),
     ).resolves.toMatchObject({ accessMode: 'INVITE_ONLY' });
   });
+
+  it('allows practice on a closed invite-only exam without a token', async () => {
+    const completed = {
+      ...exam,
+      accessMode: 'INVITE_ONLY' as const,
+      closesAt: new Date('2026-09-28T09:00:00Z'),
+    };
+    const repository = {
+      findExamForAccess: jest.fn().mockResolvedValue(completed),
+      hasActiveEnrollment: jest.fn().mockResolvedValue(true),
+    } as unknown as ExamAccessRepository;
+    const tokens = {
+      verify: jest.fn(),
+    } as unknown as ExamInvitationTokenService;
+
+    await expect(
+      new ExamAccessService(repository, tokens).authorizePractice(
+        exam.id,
+        'user-id',
+        now,
+      ),
+    ).resolves.toBe(completed);
+    expect(tokens.verify).not.toHaveBeenCalled();
+  });
+
+  it('rejects practice before the exam has closed', async () => {
+    const repository = {
+      findExamForAccess: jest.fn().mockResolvedValue(exam),
+      hasActiveEnrollment: jest.fn().mockResolvedValue(true),
+    } as unknown as ExamAccessRepository;
+    const tokens = {
+      verify: jest.fn(),
+    } as unknown as ExamInvitationTokenService;
+
+    await expect(
+      new ExamAccessService(repository, tokens).authorizePractice(
+        exam.id,
+        'user-id',
+        now,
+      ),
+    ).rejects.toBeInstanceOf(ForbiddenException);
+  });
+
+  it('rejects practice for a closed draft', async () => {
+    const repository = {
+      findExamForAccess: jest.fn().mockResolvedValue({
+        ...exam,
+        status: 'DRAFT',
+        closesAt: new Date('2026-09-28T09:00:00Z'),
+      }),
+      hasActiveEnrollment: jest.fn(),
+    } as unknown as ExamAccessRepository;
+    const tokens = {
+      verify: jest.fn(),
+    } as unknown as ExamInvitationTokenService;
+
+    await expect(
+      new ExamAccessService(repository, tokens).authorizePractice(
+        exam.id,
+        'user-id',
+        now,
+      ),
+    ).rejects.toBeInstanceOf(ForbiddenException);
+  });
+
+  it('keeps institutional practice locked to active enrollment', async () => {
+    const repository = {
+      findExamForAccess: jest.fn().mockResolvedValue({
+        ...exam,
+        status: 'COMPLETED',
+        closesAt: new Date('2026-09-28T09:00:00Z'),
+      }),
+      hasActiveEnrollment: jest.fn().mockResolvedValue(false),
+    } as unknown as ExamAccessRepository;
+    const tokens = {
+      verify: jest.fn(),
+    } as unknown as ExamInvitationTokenService;
+
+    await expect(
+      new ExamAccessService(repository, tokens).authorizePractice(
+        exam.id,
+        'user-id',
+        now,
+      ),
+    ).rejects.toBeInstanceOf(ForbiddenException);
+  });
 });

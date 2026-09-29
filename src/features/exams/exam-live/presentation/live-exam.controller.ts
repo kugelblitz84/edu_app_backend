@@ -38,6 +38,18 @@ export class StartExamAttemptController {
       },
     );
   }
+
+  @Post(':examId/attempt/practice')
+  startPractice(
+    @Param('examId', ParseUUIDPipe) examId: string,
+    @CurrentUser() user: AuthenticatedUser,
+    @Req() request: Request,
+  ) {
+    return this.startAttempt.executePractice(examId, user.userId, {
+      ipAddress: request.ip,
+      userAgent: request.get('user-agent'),
+    });
+  }
 }
 
 @Controller({ path: 'exam-attempts', version: '1' })

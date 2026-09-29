@@ -32,6 +32,11 @@ export abstract class LiveExamRepository {
     userId: string,
     metadata: AttemptMetadata,
   ): Promise<AttemptRecord | null>;
+  abstract startOrResumePractice(
+    exam: AccessibleExam,
+    userId: string,
+    metadata: AttemptMetadata,
+  ): Promise<AttemptRecord | null>;
   abstract findOwned(
     attemptId: string,
     userId: string,

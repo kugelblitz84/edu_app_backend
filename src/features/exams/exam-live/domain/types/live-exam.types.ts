@@ -20,6 +20,7 @@ export interface AttemptRecord {
   institutionId: string | null;
   contentVersion: number;
   passPercentage: number | null;
+  isPractice: boolean;
   attemptNumber: number;
   status: ExamAttemptStatus;
   startedAt: Date;

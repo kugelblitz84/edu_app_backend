@@ -16,29 +16,30 @@ enum ExamAttemptStatus {
 }
 
 model ExamAttempt {
-  id             String            @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  userId         String            @map("user_id") @db.Uuid
-  user           User              @relation(fields: [userId], references: [id], onDelete: Cascade)
-  examId         String            @map("exam_id") @db.Uuid
-  examScope      ExamAttemptScope  @map("exam_scope")
-  examName       String            @map("exam_name") @db.VarChar(200)
-  institutionId  String?           @map("institution_id") @db.Uuid
-  contentVersion Int               @map("content_version")
-  passPercentage Decimal?          @map("pass_percentage") @db.Decimal(5, 2)
-  attemptNumber  Int               @map("attempt_number")
-  status         ExamAttemptStatus @default(IN_PROGRESS)
-  startedAt      DateTime          @default(now()) @map("started_at") @db.Timestamptz
-  expiresAt      DateTime          @map("expires_at") @db.Timestamptz
-  submittedAt    DateTime?         @map("submitted_at") @db.Timestamptz
-  lastActivityAt DateTime          @default(now()) @map("last_activity_at") @db.Timestamptz
-  startedIp      String?           @map("started_ip") @db.VarChar(45)
-  userAgent      String?           @map("user_agent") @db.VarChar(512)
-  createdAt      DateTime          @default(now()) @map("created_at") @db.Timestamptz
-  updatedAt      DateTime          @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
+  id             String              @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId         String              @map("user_id") @db.Uuid
+  user           User                @relation(fields: [userId], references: [id], onDelete: Cascade)
+  examId         String              @map("exam_id") @db.Uuid
+  examScope      ExamAttemptScope    @map("exam_scope")
+  examName       String              @map("exam_name") @db.VarChar(200)
+  institutionId  String?             @map("institution_id") @db.Uuid
+  contentVersion Int                 @map("content_version")
+  passPercentage Decimal?            @map("pass_percentage") @db.Decimal(5, 2)
+  isPractice     Boolean             @default(false) @map("is_practice")
+  attemptNumber  Int                 @map("attempt_number")
+  status         ExamAttemptStatus   @default(IN_PROGRESS)
+  startedAt      DateTime            @default(now()) @map("started_at") @db.Timestamptz
+  expiresAt      DateTime            @map("expires_at") @db.Timestamptz
+  submittedAt    DateTime?           @map("submitted_at") @db.Timestamptz
+  lastActivityAt DateTime            @default(now()) @map("last_activity_at") @db.Timestamptz
+  startedIp      String?             @map("started_ip") @db.VarChar(45)
+  userAgent      String?             @map("user_agent") @db.VarChar(512)
+  createdAt      DateTime            @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt      DateTime            @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
   answers        ExamAttemptAnswer[]
   result         ExamAttemptResult?
 
-  @@unique([userId, examId, examScope, attemptNumber])
+  @@unique([userId, examId, examScope, isPractice, attemptNumber])
   @@index([userId, createdAt])
   @@index([examId, examScope])
   @@index([status, expiresAt])

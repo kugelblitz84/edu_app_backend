@@ -46,4 +46,28 @@ export class StartAttemptUseCase {
     }
     return { attempt, questions, serverTime: attempt.startedAt };
   }
+
+  async executePractice(
+    examId: string,
+    userId: string,
+    metadata: AttemptMetadata = {},
+  ) {
+    const exam = await this.access.authorizePractice(examId, userId);
+    const attempt = await this.repository.startOrResumePractice(
+      exam,
+      userId,
+      metadata,
+    );
+    if (!attempt) {
+      throw new ConflictException('A practice attempt could not be started.');
+    }
+    const questions = await this.content.getCandidateQuestions(
+      attempt.examId,
+      attempt.contentVersion,
+    );
+    if (!questions) {
+      throw new ServiceUnavailableException('Exam content is unavailable.');
+    }
+    return { attempt, questions, serverTime: attempt.startedAt };
+  }
 }

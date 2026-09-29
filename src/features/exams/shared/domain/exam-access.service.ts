@@ -36,18 +36,7 @@ export class ExamAccessService {
       throw new ForbiddenException('The exam is not currently available.');
     }
 
-    if (
-      exam.scope === 'INSTITUTIONAL' &&
-      (!exam.institutionId ||
-        !(await this.repository.hasActiveEnrollment(
-          exam.institutionId,
-          userId,
-        )))
-    ) {
-      throw new ForbiddenException(
-        'You must be enrolled in this institution to access its exams.',
-      );
-    }
+    await this.authorizeScope(exam, userId);
 
     if (exam.accessMode === 'INVITE_ONLY') {
       if (!invitationToken) this.invalidInvitation();
@@ -65,6 +54,47 @@ export class ExamAccessService {
       }
     }
     return exam;
+  }
+
+  async authorizePractice(
+    examId: string,
+    userId: string,
+    now = new Date(),
+  ): Promise<AccessibleExam> {
+    const exam = await this.repository.findExamForAccess(examId);
+    if (!exam) throw new NotFoundException('Exam not found.');
+    if (
+      !['SCHEDULED', 'RUNNING', 'COMPLETED'].includes(exam.status) ||
+      !exam.closesAt ||
+      !exam.durationMinutes ||
+      exam.contentVersion < 1 ||
+      now < exam.closesAt
+    ) {
+      throw new ForbiddenException(
+        'Practice is only available after the exam has finished.',
+      );
+    }
+
+    await this.authorizeScope(exam, userId);
+    return exam;
+  }
+
+  private async authorizeScope(
+    exam: AccessibleExam,
+    userId: string,
+  ): Promise<void> {
+    if (
+      exam.scope === 'INSTITUTIONAL' &&
+      (!exam.institutionId ||
+        !(await this.repository.hasActiveEnrollment(
+          exam.institutionId,
+          userId,
+        )))
+    ) {
+      throw new ForbiddenException(
+        'You must be enrolled in this institution to access its exams.',
+      );
+    }
   }
 
   private invalidInvitation(): never {

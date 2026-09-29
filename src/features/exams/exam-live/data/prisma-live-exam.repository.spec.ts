@@ -96,6 +96,7 @@ describe(PrismaLiveExamRepository.name, () => {
         examName: 'Fresh name',
         contentVersion: 2,
         passPercentage: 75,
+        isPractice: false,
         startedAt: now,
         expiresAt: current.closesAt,
       }),
@@ -113,5 +114,41 @@ describe(PrismaLiveExamRepository.name, () => {
       repository.startOrResume(authorizedExam, 'candidate-id', {}),
     ).resolves.toBeNull();
     expect(create).not.toHaveBeenCalled();
+  });
+
+  it('starts unlimited practice after completion without requiring invite access', async () => {
+    const completed = {
+      ...authorizedExam,
+      status: 'RUNNING' as const,
+      accessMode: 'INVITE_ONLY' as const,
+      closesAt: new Date('2030-01-01T09:30:00Z'),
+      durationMinutes: 30,
+      maxAttempts: 1,
+    };
+    const { tx, create } = transactionMock(completed);
+    tx.examAttempt.count.mockResolvedValue(7);
+    const repository = new PrismaLiveExamRepository({
+      $transaction: jest.fn().mockImplementation((callback) => callback(tx)),
+    } as unknown as PrismaService);
+
+    await expect(
+      repository.startOrResumePractice(authorizedExam, 'candidate-id', {}),
+    ).resolves.toMatchObject({
+      isPractice: true,
+      attemptNumber: 8,
+      expiresAt: new Date('2030-01-01T10:30:00Z'),
+    });
+
+    expect(tx.examAttempt.findFirst).toHaveBeenCalledWith({
+      where: expect.objectContaining({ isPractice: true }),
+      orderBy: { attemptNumber: 'desc' },
+    });
+    expect(create).toHaveBeenCalledWith({
+      data: expect.objectContaining({
+        isPractice: true,
+        attemptNumber: 8,
+        expiresAt: new Date('2030-01-01T10:30:00Z'),
+      }),
+    });
   });
 });

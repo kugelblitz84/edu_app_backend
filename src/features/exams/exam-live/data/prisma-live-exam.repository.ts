@@ -27,7 +27,27 @@ export class PrismaLiveExamRepository implements LiveExamRepository {
     for (let attempt = 1; attempt <= 3; attempt += 1) {
       try {
         return await this.prisma.$transaction(
-          (tx) => this.startOrResumeLocked(tx, exam, userId, metadata),
+          (tx) => this.startOrResumeLocked(tx, exam, userId, metadata, false),
+          { isolationLevel: 'ReadCommitted' },
+        );
+      } catch (error) {
+        if (attempt === 3 || !this.isRetryableTransactionError(error)) {
+          throw error;
+        }
+      }
+    }
+    return null;
+  }
+
+  async startOrResumePractice(
+    exam: AccessibleExam,
+    userId: string,
+    metadata: AttemptMetadata,
+  ): Promise<AttemptRecord | null> {
+    for (let attempt = 1; attempt <= 3; attempt += 1) {
+      try {
+        return await this.prisma.$transaction(
+          (tx) => this.startOrResumeLocked(tx, exam, userId, metadata, true),
           { isolationLevel: 'ReadCommitted' },
         );
       } catch (error) {
@@ -44,11 +64,13 @@ export class PrismaLiveExamRepository implements LiveExamRepository {
     authorizedExam: AccessibleExam,
     userId: string,
     metadata: AttemptMetadata,
+    isPractice: boolean,
   ): Promise<AttemptRecord | null> {
     await tx.$queryRaw`SELECT pg_advisory_xact_lock(hashtext(${
       'exam:' + authorizedExam.id
     })) IS NULL AS locked`;
-    const lockKey = `${userId}:${authorizedExam.scope}:${authorizedExam.id}`;
+    const attemptKind = isPractice ? 'practice' : 'live';
+    const lockKey = `${userId}:${authorizedExam.scope}:${authorizedExam.id}:${attemptKind}`;
     await tx.$queryRaw`SELECT pg_advisory_xact_lock(hashtext(${lockKey})) IS NULL AS locked`;
 
     const [{ now }] = await tx.$queryRaw<{ now: Date }[]>`
@@ -105,17 +127,20 @@ export class PrismaLiveExamRepository implements LiveExamRepository {
     }
 
     const transactionNow = new Date(now);
+    if (!exam) return null;
+    const hasValidContent =
+      !!exam.closesAt && !!exam.durationMinutes && exam.contentVersion >= 1;
     if (
-      !exam ||
-      !['SCHEDULED', 'RUNNING'].includes(exam.status) ||
-      !exam.startsAt ||
-      !exam.closesAt ||
-      !exam.durationMinutes ||
-      exam.contentVersion < 1 ||
-      transactionNow < exam.startsAt ||
-      transactionNow >= exam.closesAt ||
-      (exam.accessMode === 'INVITE_ONLY' &&
-        authorizedExam.accessMode !== 'INVITE_ONLY')
+      !hasValidContent ||
+      (isPractice
+        ? !['SCHEDULED', 'RUNNING', 'COMPLETED'].includes(exam.status) ||
+          transactionNow < exam.closesAt!
+        : !['SCHEDULED', 'RUNNING'].includes(exam.status) ||
+          !exam.startsAt ||
+          transactionNow < exam.startsAt ||
+          transactionNow >= exam.closesAt! ||
+          (exam.accessMode === 'INVITE_ONLY' &&
+            authorizedExam.accessMode !== 'INVITE_ONLY'))
     ) {
       return null;
     }
@@ -144,6 +169,7 @@ export class PrismaLiveExamRepository implements LiveExamRepository {
         userId,
         examId: exam.id,
         examScope: exam.scope,
+        isPractice,
         status: 'IN_PROGRESS',
         expiresAt: { gt: transactionNow },
       },
@@ -156,6 +182,7 @@ export class PrismaLiveExamRepository implements LiveExamRepository {
         userId,
         examId: exam.id,
         examScope: exam.scope,
+        isPractice,
         status: 'IN_PROGRESS',
         expiresAt: { lte: transactionNow },
       },
@@ -166,15 +193,19 @@ export class PrismaLiveExamRepository implements LiveExamRepository {
         userId,
         examId: exam.id,
         examScope: exam.scope,
+        isPractice,
         status: { not: 'CANCELLED' },
       },
     });
-    if (used >= exam.maxAttempts) return null;
+    if (!isPractice && used >= exam.maxAttempts) return null;
 
     const durationEnd = new Date(
-      transactionNow.getTime() + exam.durationMinutes * 60_000,
+      transactionNow.getTime() + exam.durationMinutes! * 60_000,
     );
-    const expiresAt = exam.closesAt < durationEnd ? exam.closesAt : durationEnd;
+    const expiresAt =
+      !isPractice && exam.closesAt! < durationEnd
+        ? exam.closesAt!
+        : durationEnd;
     const created = await tx.examAttempt.create({
       data: {
         userId,
@@ -184,6 +215,7 @@ export class PrismaLiveExamRepository implements LiveExamRepository {
         institutionId: exam.institutionId,
         contentVersion: exam.contentVersion,
         passPercentage: exam.passPercentage,
+        isPractice,
         attemptNumber: used + 1,
         startedAt: transactionNow,
         expiresAt,
