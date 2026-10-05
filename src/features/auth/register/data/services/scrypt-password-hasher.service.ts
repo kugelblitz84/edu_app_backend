@@ -1,39 +1,48 @@
-import { Injectable } from '@nestjs/common';
+import { Inject, Injectable } from '@nestjs/common';
 import { randomBytes, scrypt } from 'node:crypto';
+import {
+  APP_CONFIG,
+  type AppConfig,
+} from '../../../../../core/config/app-config';
 import { PasswordHasher } from '../../domain/contracts/password-hasher.service';
-
-const KEY_LENGTH = 64;
-const COST = 16_384;
-const BLOCK_SIZE = 8;
-const PARALLELIZATION = 1;
 
 @Injectable()
 export class ScryptPasswordHasher implements PasswordHasher {
+  constructor(@Inject(APP_CONFIG) private readonly config: AppConfig) {}
+
   async hash(password: string): Promise<string> {
     const salt = randomBytes(16).toString('base64url');
     const derivedKey = await this.deriveKey(password, salt);
+    const { cost, blockSize, parallelization } = this.config.passwordHashing;
 
     return [
       'scrypt',
-      COST,
-      BLOCK_SIZE,
-      PARALLELIZATION,
+      cost,
+      blockSize,
+      parallelization,
       salt,
       derivedKey.toString('base64url'),
     ].join('$');
   }
 
   private deriveKey(password: string, salt: string): Promise<Buffer> {
+    const { keyLength, cost, blockSize, parallelization } =
+      this.config.passwordHashing;
     return new Promise((resolve, reject) => {
       scrypt(
         password,
         salt,
-        KEY_LENGTH,
+        keyLength,
         {
-          N: COST,
-          r: BLOCK_SIZE,
-          p: PARALLELIZATION,
-          maxmem: 32 * 1024 * 1024,
+          N: cost,
+          r: blockSize,
+          p: parallelization,
+          maxmem: this.calculateMaxMemory(
+            cost,
+            blockSize,
+            parallelization,
+            keyLength,
+          ),
         },
         (error, derivedKey) => {
           if (error) {
@@ -45,5 +54,19 @@ export class ScryptPasswordHasher implements PasswordHasher {
         },
       );
     });
+  }
+
+  private calculateMaxMemory(
+    cost: number,
+    blockSize: number,
+    parallelization: number,
+    keyLength: number,
+  ): number {
+    return (
+      128 * cost * blockSize +
+      128 * blockSize * parallelization +
+      keyLength +
+      1024 * 1024
+    );
   }
 }

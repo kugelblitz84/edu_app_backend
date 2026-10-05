@@ -1,17 +1,14 @@
 import { PasswordHasher } from '../contracts/password-hasher.service';
-import { normalizer, RegisterUserInput } from '../contracts/normalizer.service';
+import { normalizer } from '../contracts/normalizer.service';
 import { RegisterUserRepository } from '../contracts/register-user.repository';
+import type { RegisterUserInput } from '../contracts/types';
 import type { RegisteredUser } from '../entities/registered-user.entity';
-
-
-
-
 
 export class RegisterUserUseCase {
   constructor(
     private readonly repository: RegisterUserRepository,
     private readonly passwordHasher: PasswordHasher,
-    private readonly normalizer: normalizer
+    private readonly normalizer: normalizer,
   ) {}
 
   async execute(input: RegisterUserInput): Promise<RegisteredUser> {
@@ -25,6 +22,4 @@ export class RegisterUserUseCase {
       fullName: normalized.username,
     });
   }
-
-  
 }

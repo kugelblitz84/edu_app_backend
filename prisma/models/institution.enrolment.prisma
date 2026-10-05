@@ -1,0 +1,31 @@
+enum EnrollmentStatus {
+  PENDING
+  ACTIVE
+  SUSPENDED
+  CANCELLED
+  EXPIRED
+
+  @@map("enrollment_status")
+}
+
+model Enrollment {
+  institutionId String           @map("institution_id") @db.Uuid
+  userId        String           @map("user_id") @db.Uuid
+  status        EnrollmentStatus @default(PENDING)
+
+  enrolledAt    DateTime?        @map("enrolled_at") @db.Timestamptz
+  expiresAt     DateTime?        @map("expires_at") @db.Timestamptz
+  createdAt     DateTime         @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt     DateTime         @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
+
+  institution   Institution     @relation(fields: [institutionId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  user          User            @relation(fields: [userId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+
+  
+
+  @@id([institutionId, userId])
+  @@index([userId])
+  @@index([institutionId, status])
+  @@index([status])
+  @@map("enrollments")
+}

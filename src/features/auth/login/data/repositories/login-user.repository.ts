@@ -1,9 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../../../../../core/database/prisma.service';
-import {
-  LoginUserRepository,
-  type LoginUserRecord,
-} from '../../domain/contracts/login-user.repository';
+import { LoginUserRepository } from '../../domain/contracts/login-user.repository';
+import type { LoginUserRecord } from '../../domain/contracts/types';
 
 @Injectable()
 export class PrismaLoginUserRepository implements LoginUserRepository {
@@ -25,10 +23,19 @@ export class PrismaLoginUserRepository implements LoginUserRepository {
     });
   }
 
-  async recordSuccessfulLogin(userId: string, loggedInAt: Date): Promise<void> {
+  async recordSuccessfulLogin(
+    userId: string,
+    loggedInAt: Date,
+    ipAddress?: string,
+    ipRegion?: string,
+  ): Promise<void> {
     await this.prisma.user.update({
       where: { id: userId },
-      data: { lastLoginAt: loggedInAt },
+      data: {
+        lastLoginAt: loggedInAt,
+        lastLoginIp: ipAddress,
+        lastLoginRegion: ipRegion,
+      },
       select: { id: true },
     });
   }

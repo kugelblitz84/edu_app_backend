@@ -1,13 +1,12 @@
-import {
-  LoginUserRepository,
-  type LoginUserRecord,
-} from '../contracts/login-user.repository';
+import { SessionService } from '../../../../../core/auth/services/session.service';
+import type {
+  AuthTokenPair,
+  SessionMetadata,
+  SessionUser,
+} from '../../../../../core/auth/auth.types';
+import { LoginUserRepository } from '../contracts/login-user.repository';
+import type { LoginUserRecord } from '../contracts/types';
 import { PasswordVerifier } from '../contracts/password-verifier.service';
-import {
-  type AccessTokenSubject,
-  type GeneratedTokenPair,
-  TokenGenerator,
-} from '../contracts/token-generator.service';
 import {
   InvalidCredentialsError,
   LoginNotAllowedError,
@@ -20,7 +19,7 @@ const ACTIVE_USER: LoginUserRecord = {
   username: 'learner_01',
   fullName: 'Test Learner',
   passwordHash: 'stored-hash',
-  platformRole: 'GUEST',
+  platformRole: 'PLATFORM_USER',
   status: 'ACTIVE',
   emailVerifiedAt: new Date('2026-08-01T00:00:00.000Z'),
 };
@@ -50,16 +49,21 @@ class FakePasswordVerifier implements PasswordVerifier {
   }
 }
 
-class FakeTokenGenerator implements TokenGenerator {
-  public subject?: AccessTokenSubject;
+class FakeTokenGenerator implements Pick<SessionService, 'create'> {
+  public subject?: SessionUser;
+  public metadata?: SessionMetadata;
 
-  generate(subject: AccessTokenSubject): GeneratedTokenPair {
+  create(
+    subject: SessionUser,
+    metadata?: SessionMetadata,
+  ): Promise<AuthTokenPair> {
     this.subject = subject;
-    return {
+    this.metadata = metadata;
+    return Promise.resolve({
       accessToken: 'access-token',
       refreshToken: 'refresh-token',
       accessTokenExpiresIn: 900,
-    };
+    });
   }
 }
 
@@ -80,11 +84,8 @@ describe(LoginUseCase.name, () => {
 
     expect(tokenGenerator.subject).toEqual({
       userId: ACTIVE_USER.id,
-      username: ACTIVE_USER.username,
-      email: ACTIVE_USER.email,
-      platformRole: 'GUEST',
+      platformRole: 'PLATFORM_USER',
       status: 'ACTIVE',
-      emailVerified: true,
     });
     expect(result).toMatchObject({
       user: {

@@ -2,60 +2,47 @@ import {
   Body,
   ConflictException,
   Controller,
-  PipeTransform,
   Post,
   UnprocessableEntityException,
 } from '@nestjs/common';
+import { CurrentUser } from '../../../../../core/auth/decorators/current-user.decorator';
+import { Public } from '../../../../../core/auth/decorators/public.decorator';
+import type { AuthenticatedUser } from '../../../../../core/auth/auth.types';
+import { ZodValidationPipe } from '../../../../../core/validator/zod-validation.pipe';
 import {
+  InstitutionRegistrationConflictError,
   RegistrationConflictError,
   RegistrationValidationError,
 } from '../../domain/errors/registration.error';
+import { RegisterInstitutionUseCase } from '../../domain/use-cases/register-institution.use-case';
 import { RegisterUserUseCase } from '../../domain/use-cases/register-user.use-case';
 import {
   registerUserRequestSchema,
   type RegisterUserRequestDto,
 } from '../dto/register-user-request.dto';
+
+import { registerInstitutionRequestSchema } from '../dto/register-institution-request.dto';
+import type { RegisterInstitutionRequestDto } from '../dto/register-institution-request.dto';
+import {
+  toRegisterInstitutionResponseDto,
+  type RegisterInstitutionResponseDto,
+} from '../dto/register-institution-response.dto';
 import {
   toRegisterUserResponseDto,
   type RegisterUserResponseDto,
 } from '../dto/register-user-response.dto';
 
-const UNSUPPORTED_FIELDS_MESSAGE =
-  'Registration request contains unsupported fields.';
-
-class RegisterUserRequestValidationPipe implements PipeTransform<
-  unknown,
-  RegisterUserRequestDto
-> {
-  transform(value: unknown): RegisterUserRequestDto {
-    const result = registerUserRequestSchema.safeParse(value);
-
-    if (result.success) {
-      return result.data;
-    }
-
-    throw new UnprocessableEntityException({
-      message: 'Registration request is invalid.',
-      violations: [
-        ...new Set(
-          result.error.issues.map((issue) =>
-            issue.code === 'unrecognized_keys'
-              ? UNSUPPORTED_FIELDS_MESSAGE
-              : issue.message,
-          ),
-        ),
-      ],
-    });
-  }
-}
-
 @Controller({ path: 'auth', version: '1' })
 export class RegisterController {
-  constructor(private readonly registerUser: RegisterUserUseCase) {}
+  constructor(
+    private readonly registerUser: RegisterUserUseCase,
+    private readonly registerInstitutionUseCase: RegisterInstitutionUseCase,
+  ) {}
 
-  @Post('register')
+  @Post('register/user')
+  @Public()
   async register(
-    @Body(new RegisterUserRequestValidationPipe())
+    @Body(new ZodValidationPipe(registerUserRequestSchema))
     request: RegisterUserRequestDto,
   ): Promise<RegisterUserResponseDto> {
     try {
@@ -71,6 +58,28 @@ export class RegisterController {
       }
 
       if (error instanceof RegistrationConflictError) {
+        throw new ConflictException(error.message);
+      }
+
+      throw error;
+    }
+  }
+
+  @Post('register/institution')
+  async registerInstitution(
+    @Body(new ZodValidationPipe(registerInstitutionRequestSchema))
+    request: RegisterInstitutionRequestDto,
+    @CurrentUser() currentUser: AuthenticatedUser,
+  ): Promise<RegisterInstitutionResponseDto> {
+    try {
+      const institution = await this.registerInstitutionUseCase.execute(
+        request,
+        currentUser.userId,
+      );
+
+      return toRegisterInstitutionResponseDto(institution);
+    } catch (error) {
+      if (error instanceof InstitutionRegistrationConflictError) {
         throw new ConflictException(error.message);
       }
 

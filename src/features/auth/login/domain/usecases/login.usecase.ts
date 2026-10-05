@@ -1,6 +1,6 @@
+import { SessionService } from '../../../../../core/auth/services/session.service';
 import { LoginUserRepository } from '../contracts/login-user.repository';
 import { PasswordVerifier } from '../contracts/password-verifier.service';
-import { TokenGenerator } from '../contracts/token-generator.service';
 import type { LoggedInUser } from '../entities/logged-in-user.entity';
 import {
   InvalidCredentialsError,
@@ -12,14 +12,23 @@ export interface LoginInput {
   password?: unknown;
 }
 
+export interface LoginContext {
+  ipAddress?: string;
+  ipRegion?: string;
+  userAgent?: string;
+}
+
 export class LoginUseCase {
   constructor(
     private readonly repository: LoginUserRepository,
     private readonly passwordVerifier: PasswordVerifier,
-    private readonly tokenGenerator: TokenGenerator,
+    private readonly sessions: Pick<SessionService, 'create'>,
   ) {}
 
-  async execute(input: LoginInput): Promise<LoggedInUser> {
+  async execute(
+    input: LoginInput,
+    context: LoginContext = {},
+  ): Promise<LoggedInUser> {
     const username =
       typeof input.username === 'string' ? input.username.trim() : '';
     const password = typeof input.password === 'string' ? input.password : '';
@@ -41,16 +50,24 @@ export class LoginUseCase {
       throw new LoginNotAllowedError();
     }
 
-    const tokens = this.tokenGenerator.generate({
-      userId: user.id,
-      username: user.username,
-      email: user.email,
-      platformRole: user.platformRole,
-      status: user.status,
-      emailVerified: user.emailVerifiedAt !== null,
-    });
+    const tokens = await this.sessions.create(
+      {
+        userId: user.id,
+        platformRole: user.platformRole,
+        status: user.status,
+      },
+      {
+        ipAddress: context.ipAddress,
+        userAgent: context.userAgent,
+      },
+    );
 
-    await this.repository.recordSuccessfulLogin(user.id, new Date());
+    await this.repository.recordSuccessfulLogin(
+      user.id,
+      new Date(),
+      context.ipAddress,
+      context.ipRegion,
+    );
 
     return {
       user: {

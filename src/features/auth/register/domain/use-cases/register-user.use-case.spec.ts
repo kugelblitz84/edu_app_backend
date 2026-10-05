@@ -1,9 +1,7 @@
 import { NormalizeAndValidateServiceImpl } from '../../data/services/normalize-and-validate.service';
 import { PasswordHasher } from '../contracts/password-hasher.service';
-import {
-  CreateUserRecord,
-  RegisterUserRepository,
-} from '../contracts/register-user.repository';
+import { RegisterUserRepository } from '../contracts/register-user.repository';
+import type { CreateUserRecord } from '../contracts/types';
 import { RegistrationValidationError } from '../errors/registration.error';
 import { RegisterUserUseCase } from './register-user.use-case';
 
@@ -23,7 +21,7 @@ class FakeRegisterUserRepository implements RegisterUserRepository {
       id: '5cae6d1a-930c-45a2-8408-8fb1be8446af',
       email: user.email,
       username: user.username,
-      platformRole: 'GUEST' as const,
+      platformRole: 'PLATFORM_USER' as const,
       status: 'ACTIVE' as const,
       createdAt: new Date('2026-08-03T00:00:00.000Z'),
     });
@@ -42,16 +40,16 @@ describe(RegisterUserUseCase.name, () => {
     const user = await useCase.execute({
       email: '  USER@Example.COM ',
       username: 'learner_01',
-      password: 'StrongPass123',
+      password: 'StrongPassword123',
     });
 
     expect(repository.createdUser).toEqual({
       email: 'user@example.com',
       username: 'learner_01',
-      passwordHash: 'hashed:StrongPass123',
+      passwordHash: 'hashed:StrongPassword123',
       fullName: 'learner_01',
     });
-    expect(user.platformRole).toBe('GUEST');
+    expect(user.platformRole).toBe('PLATFORM_USER');
     expect(user.status).toBe('ACTIVE');
   });
 

@@ -1,0 +1,43 @@
+enum ExamStatus {
+  DRAFT
+  SCHEDULED
+  RUNNING
+  COMPLETED
+  // ARCHIVED
+  CANCELLED
+
+  @@map("exam_status")
+}
+
+enum ExamAccessMode {
+  OPEN
+  INVITE_ONLY
+
+  @@map("exam_access_mode")
+}
+
+model PersonalExam {
+  id              String         @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  name            String         @db.VarChar(200)
+  description     String?        @db.VarChar(1000)
+  startsAt        DateTime?      @map("starts_at") @db.Timestamptz
+  closesAt        DateTime?      @map("closes_at") @db.Timestamptz
+  durationMinutes Int?           @map("duration_minutes")
+  maxAttempts     Int            @default(1) @map("max_attempts")
+  passPercentage  Decimal?       @map("pass_percentage") @db.Decimal(5, 2)
+  contentVersion  Int            @default(0) @map("content_version")
+  status          ExamStatus     @default(DRAFT)
+  accessMode      ExamAccessMode @default(OPEN) @map("access_mode")
+  createdByUserId String         @map("created_by_user_id") @db.Uuid
+  createdByUser   User           @relation(fields: [createdByUserId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  createdAt       DateTime       @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt       DateTime       @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
+  deletedAt       DateTime?      @map("deleted_at") @db.Timestamptz
+
+  @@index([createdByUserId])
+  @@index([startsAt])
+  @@index([closesAt])
+  @@index([status])
+  @@index([createdAt])
+  @@map("personal_exams")
+}

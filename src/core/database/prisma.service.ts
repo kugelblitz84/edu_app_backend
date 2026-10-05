@@ -18,6 +18,7 @@ export class PrismaService
     super({
       adapter: new PrismaPg({
         connectionString: config.databaseUrl,
+        options: '-c timezone=UTC',
       }),
     });
   }

@@ -1,22 +1,9 @@
 import { Module } from '@nestjs/common';
-import { ProcessSystemStatusService } from './data/services/process-system-status.service';
-import { SystemStatusService } from './domain/contracts/system-status-abstract.service';
-import { GetHealthStatusUseCase } from './domain/use-cases/get-health-status.use-case';
-import { HealthController } from './presentation/controllers/health.controller';
+import { HealthController } from './health.controller';
+import { HealthService } from './health.service';
 
 @Module({
   controllers: [HealthController],
-  providers: [
-    {
-      provide: SystemStatusService,
-      useClass: ProcessSystemStatusService,
-    },
-    {
-      provide: GetHealthStatusUseCase,
-      useFactory: (provider: SystemStatusService) =>
-        new GetHealthStatusUseCase(provider),
-      inject: [SystemStatusService],
-    },
-  ],
+  providers: [HealthService],
 })
 export class HealthModule {}
