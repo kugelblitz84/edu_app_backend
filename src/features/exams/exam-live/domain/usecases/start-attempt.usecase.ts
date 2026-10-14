@@ -3,6 +3,7 @@ import {
   Injectable,
   ServiceUnavailableException,
 } from '@nestjs/common';
+import { scheduledExamResponse } from '../../../shared/domain/scheduled-exam.response';
 import { ExamAccessService } from '../../../shared/domain/exam-access.service';
 import { ExamContentReader } from '../contracts/exam-content.reader';
 import {
@@ -31,6 +32,9 @@ export class StartAttemptUseCase {
       invitationToken,
       now,
     );
+    if (exam.startsAt && now < exam.startsAt) {
+      return scheduledExamResponse(exam.id, exam.startsAt);
+    }
     const attempt = await this.repository.startOrResume(exam, userId, metadata);
     if (!attempt) {
       throw new ConflictException(

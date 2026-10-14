@@ -158,6 +158,7 @@ export class PrismaUserExamRepository implements UserExamRepository {
           accessMode: true,
           startsAt: true,
           closesAt: true,
+          durationMinutes: true,
         },
         orderBy: [{ createdAt: 'desc' }, { id: 'asc' }],
         skip: (query.page - 1) * query.limit,
@@ -169,6 +170,8 @@ export class PrismaUserExamRepository implements UserExamRepository {
     return {
       list: exams.map(({ startsAt, closesAt, ...exam }) => ({
         ...exam,
+        startsAt,
+        closesAt,
         status: this.displayStatus(startsAt, closesAt, now),
         scope: 'INSTITUTIONAL',
       })),

@@ -1,3 +1,4 @@
+import type { ScheduledExamResponse } from '../../shared/domain/scheduled-exam.response';
 import { z } from 'zod';
 
 export const authorizeExamAccessSchema = z
@@ -48,6 +49,9 @@ export interface PublicExamResponseDto {
 
 export interface InstitutionExamResponseDto {
   id: string;
+  startsAt: Date | null;
+  closesAt: Date | null;
+  durationMinutes: number | null;
   scope: 'INSTITUTIONAL';
   accessMode: 'OPEN' | 'INVITE_ONLY';
   status: 'SCHEDULED' | 'RUNNING';
@@ -61,7 +65,10 @@ export interface PaginatedExamResponseDto<TExam> {
   totalPages: number;
 }
 
-export interface AuthorizeExamAccessResponseDto {
+export type AuthorizeExamAccessResponseDto =
+  ScheduledExamResponse | AuthorizedExamAccessResponseDto;
+
+export interface AuthorizedExamAccessResponseDto {
   authorized: true;
   examId: string;
   scope: 'PUBLIC' | 'INSTITUTIONAL';

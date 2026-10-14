@@ -30,7 +30,6 @@ export class ExamAccessService {
       !exam.closesAt ||
       !exam.durationMinutes ||
       exam.contentVersion < 1 ||
-      now < exam.startsAt ||
       now >= exam.closesAt
     ) {
       throw new ForbiddenException('The exam is not currently available.');

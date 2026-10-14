@@ -75,6 +75,7 @@ describe(PrismaUserExamRepository.name, () => {
       accessMode: 'OPEN',
       startsAt: new Date('2026-10-01T00:00:00.000Z'),
       closesAt: new Date('2026-10-02T00:00:00.000Z'),
+      durationMinutes: 60,
     };
     const findMany = jest.fn().mockResolvedValue([exam]);
     const count = jest.fn().mockResolvedValue(21);
@@ -98,6 +99,9 @@ describe(PrismaUserExamRepository.name, () => {
       list: [
         {
           id: exam.id,
+          startsAt: exam.startsAt,
+          closesAt: exam.closesAt,
+          durationMinutes: exam.durationMinutes,
           status: 'SCHEDULED',
           accessMode: exam.accessMode,
           scope: 'INSTITUTIONAL',

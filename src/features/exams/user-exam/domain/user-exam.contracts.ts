@@ -17,8 +17,14 @@ export interface InstitutionExamQuery {
   limit: number;
 }
 
+export interface InstitutionExamListItem extends AccessibleExam {
+  startsAt: Date | null;
+  closesAt: Date | null;
+  durationMinutes: number | null;
+}
+
 export interface InstitutionExamPage {
-  list: AccessibleExam[];
+  list: InstitutionExamListItem[];
   total: number;
 }
 

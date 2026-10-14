@@ -77,7 +77,13 @@ describe(UserExamUseCases.name, () => {
     const { useCases, hasActiveEnrollment, findInstitutionExams } =
       useCasesMock();
     const institutionId = '1030af05-ed3a-4327-8c99-17acc15f2eb6';
-    const institutionExam = { ...exam, scope: 'INSTITUTIONAL' as const };
+    const institutionExam = {
+      ...exam,
+      scope: 'INSTITUTIONAL' as const,
+      startsAt: new Date('2026-10-15T10:00:00Z'),
+      closesAt: new Date('2026-10-15T12:00:00Z'),
+      durationMinutes: 60,
+    };
     hasActiveEnrollment.mockResolvedValue(true);
     findInstitutionExams.mockResolvedValue({
       list: [institutionExam],

@@ -1,4 +1,8 @@
 import { ForbiddenException, Injectable } from '@nestjs/common';
+import {
+  scheduledExamResponse,
+  type ScheduledExamResponse,
+} from '../../shared/domain/scheduled-exam.response';
 import { ExamAccessService } from '../../shared/domain/exam-access.service';
 import type { ExamInvitationTokenService } from '../../admin-exam/domain/exam-invitation.services';
 import {
@@ -42,12 +46,20 @@ export class UserExamUseCases {
     examId: string,
     userId: string,
     invitationToken?: string,
-  ): Promise<ExamAccessAuthorization> {
+  ): Promise<ExamAccessAuthorization | ScheduledExamResponse> {
     const exam = await this.authorizeWithCompatibleBoundary(
       examId,
       userId,
       invitationToken,
     );
+
+    if (
+      'startsAt' in exam &&
+      exam.startsAt instanceof Date &&
+      new Date() < exam.startsAt
+    ) {
+      return scheduledExamResponse(exam.id, exam.startsAt);
+    }
 
     return {
       authorized: true,
@@ -110,6 +122,9 @@ export class UserExamUseCases {
     return {
       list: result.list.map((exam) => ({
         id: exam.id,
+        startsAt: exam.startsAt,
+        closesAt: exam.closesAt,
+        durationMinutes: exam.durationMinutes,
         scope: 'INSTITUTIONAL',
         accessMode: exam.accessMode,
         status: exam.status as InstitutionExamResponseDto['status'],
