@@ -6,6 +6,7 @@ import { AuthModule } from '../features/auth/auth.module';
 import { GlobalAdminModule } from '../features/global_admin/global-admin.module';
 import { HealthModule } from '../features/health/health.module';
 import { ExamModule } from '../features/exams/exam.module';
+import { UserProfileModule } from '../features/user-profile/user-profile.module';
 
 @Module({
   imports: [
@@ -16,6 +17,7 @@ import { ExamModule } from '../features/exams/exam.module';
     AuthModule,
     GlobalAdminModule,
     ExamModule,
+    UserProfileModule,
   ],
 })
 export class AppModule {}
