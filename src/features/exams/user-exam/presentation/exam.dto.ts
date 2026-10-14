@@ -74,3 +74,13 @@ export interface AuthorizedExamAccessResponseDto {
   scope: 'PUBLIC' | 'INSTITUTIONAL';
   accessMode: 'OPEN' | 'INVITE_ONLY';
 }
+
+export const examHistoryQuerySchema = z
+  .object({
+    page: z.coerce.number().int().min(1).default(1),
+    limit: z.coerce.number().int().min(1).max(100).default(20),
+    examId: z.string().uuid().optional(),
+    scope: z.enum(['PUBLIC', 'INSTITUTIONAL']).optional(),
+  })
+  .strict();
+export type ExamHistoryQueryDto = z.infer<typeof examHistoryQuerySchema>;

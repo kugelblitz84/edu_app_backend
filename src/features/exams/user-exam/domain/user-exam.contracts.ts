@@ -1,3 +1,5 @@
+import type { AuthenticatedUser } from '../../../../core/auth/auth.types';
+import type { Prisma } from '@prisma/client';
 import type {
   ExamAccessMode,
   ExamScope,
@@ -61,6 +63,17 @@ export interface PublicExamPage {
 }
 
 export abstract class UserExamRepository {
+  abstract findHistory(
+    userId: string,
+    viewer: AuthenticatedUser,
+    query: ExamHistoryQuery,
+  ): Promise<{ list: ExamAttemptHistoryItem[]; total: number }>;
+  abstract findAttempt(
+    userId: string,
+    attemptId: string,
+    viewer: AuthenticatedUser,
+  ): Promise<ExamAttemptHistoryItem | null>;
+
   abstract findAvailableById(id: string): Promise<AccessibleExam | null>;
   abstract hasActiveEnrollment(
     institutionId: string,
@@ -71,4 +84,42 @@ export abstract class UserExamRepository {
     query: InstitutionExamQuery,
   ): Promise<InstitutionExamPage>;
   abstract findPublicExams(query: PublicExamQuery): Promise<PublicExamPage>;
+}
+
+export interface ExamHistoryQuery {
+  page: number;
+  limit: number;
+  examId?: string;
+  scope?: ExamScope;
+}
+export interface ExamAttemptHistoryItem {
+  id: string;
+  examId: string;
+  examScope: ExamScope;
+  examName: string;
+  institutionId: string | null;
+  contentVersion: number;
+  isPractice: boolean;
+  attemptNumber: number;
+  status: string;
+  startedAt: Date;
+  expiresAt: Date;
+  submittedAt: Date | null;
+  totalScore: number | null;
+  result?: {
+    maximumScore: number;
+    percentage: number;
+    passed: boolean | null;
+    correctAnswers: number;
+    incorrectAnswers: number;
+    unanswered: number;
+    gradedAt: Date;
+  } | null;
+  answers?: {
+    questionId: string;
+    answerData: Prisma.JsonValue;
+    isCorrect: boolean | null;
+    awardedMarks: number | null;
+    answeredAt: Date;
+  }[];
 }

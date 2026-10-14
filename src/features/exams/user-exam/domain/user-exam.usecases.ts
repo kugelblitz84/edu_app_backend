@@ -1,4 +1,10 @@
-import { ForbiddenException, Injectable } from '@nestjs/common';
+import type { AuthenticatedUser } from '../../../../core/auth/auth.types';
+import type { ExamHistoryQuery } from './user-exam.contracts';
+import {
+  ForbiddenException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import {
   scheduledExamResponse,
   type ScheduledExamResponse,
@@ -27,6 +33,34 @@ export class UserExamUseCases {
     private readonly repository: UserExamRepository,
     private readonly access: ExamAccessService,
   ) {}
+
+  async getHistory(
+    userId: string,
+    viewer: AuthenticatedUser,
+    query: ExamHistoryQuery,
+  ) {
+    const result = await this.repository.findHistory(userId, viewer, query);
+    return {
+      ...result,
+      page: query.page,
+      limit: query.limit,
+      totalPages: Math.ceil(result.total / query.limit),
+    };
+  }
+
+  async getAttempt(
+    userId: string,
+    attemptId: string,
+    viewer: AuthenticatedUser,
+  ) {
+    const attempt = await this.repository.findAttempt(
+      userId,
+      attemptId,
+      viewer,
+    );
+    if (!attempt) throw new NotFoundException('Exam attempt not found.');
+    return attempt;
+  }
 
   async getPublicExams(
     query: PublicExamQuery,

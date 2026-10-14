@@ -1,3 +1,4 @@
+import { examHistoryQuerySchema, type ExamHistoryQueryDto } from './exam.dto';
 import {
   Get,
   Body,
@@ -29,6 +30,42 @@ import {
 @Controller({ path: 'exams', version: '1' })
 export class UserExamController {
   constructor(private readonly useCases: UserExamUseCases) {}
+  @Get('me/history')
+  getMyHistory(
+    @CurrentUser() viewer: AuthenticatedUser,
+    @Query(new ZodValidationPipe(examHistoryQuerySchema))
+    query: ExamHistoryQueryDto,
+  ) {
+    return this.useCases.getHistory(viewer.userId, viewer, query);
+  }
+
+  @Get('me/history/:attemptId')
+  getMyAttempt(
+    @CurrentUser() viewer: AuthenticatedUser,
+    @Param('attemptId', ParseUUIDPipe) attemptId: string,
+  ) {
+    return this.useCases.getAttempt(viewer.userId, attemptId, viewer);
+  }
+
+  @Get('users/:userId/history')
+  getUserHistory(
+    @Param('userId', ParseUUIDPipe) userId: string,
+    @CurrentUser() viewer: AuthenticatedUser,
+    @Query(new ZodValidationPipe(examHistoryQuerySchema))
+    query: ExamHistoryQueryDto,
+  ) {
+    return this.useCases.getHistory(userId, viewer, query);
+  }
+
+  @Get('users/:userId/history/:attemptId')
+  getUserAttempt(
+    @Param('userId', ParseUUIDPipe) userId: string,
+    @Param('attemptId', ParseUUIDPipe) attemptId: string,
+    @CurrentUser() viewer: AuthenticatedUser,
+  ) {
+    return this.useCases.getAttempt(userId, attemptId, viewer);
+  }
+
   @Get('public')
   @Public()
   async getPublicExams(
