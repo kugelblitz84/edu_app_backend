@@ -38,6 +38,7 @@ model User {
   createdInstitutions   Institution[]
   reviewedInstitutions  Institution[]      @relation("InstitutionReviewer")
   institutionAdminships InstitutionAdmin[]
+  ownedResources        Resource[]         @relation("ResourceOwner")
   personalExams         PersonalExam[]
   institutionExams      InstitutionExam[]
   examAttempts          ExamAttempt[]
