@@ -11,7 +11,7 @@ enum ResourceAccessPolicy {
   OWNER_ONLY
   ENROLLED
   PURCHASE
-  SUBSCRIPTION
+  // SUBSCRIPTION
 
   @@map("resource_access_policy")
 }
@@ -28,13 +28,17 @@ enum ResourceStatus {
 model Resource {
   id               String               @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   type             ResourceType
+  publicURL        String               @map("public_url") @db.VarChar(200)
+  privateURL       String               @map("private_url") @db.VarChar(200)
   title            String               @db.VarChar(200)
   description      String               @db.Text
   ownerUserId      String?              @map("owner_user_id") @db.Uuid
-  ownerUser       User?                @relation("ResourceOwner", fields: [ownerUserId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  ownerUser        User                 @relation("ResourceOwner", fields: [ownerUserId], references: [id], onDelete: Restrict, onUpdate: Cascade)
   institutionId    String?              @map("institution_id") @db.Uuid
   uploadedByUserId String               @map("uploaded_by_user_id") @db.Uuid
   accessPolicy     ResourceAccessPolicy @map("access_policy")
+  price            String?
+  collectionId     String?              @map("collection_id") @db.Uuid
   status           ResourceStatus       @default(DRAFT)
   metadata         Json?                @db.JsonB
   createdAt        DateTime             @default(now()) @map("created_at") @db.Timestamptz
@@ -42,4 +46,18 @@ model Resource {
   publishedAt      DateTime?            @map("published_at") @db.Timestamptz
 
   @@map("resources")
+}
+
+model ResourceCollection {
+  id           String               @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  title        String               @db.VarChar(200)
+  description  String?              @db.Text
+  //isPaid       boolean              @default("False")
+  accessPolicy ResourceAccessPolicy @map("access_policy")
+  status       ResourceStatus       @default(DRAFT)
+  metadata     Json?                @db.JsonB
+  createdAt    DateTime             @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt    DateTime             @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
+  publishedAt  DateTime?            @map("published_at") @db.Timestamptz
+  price        String?
 }
