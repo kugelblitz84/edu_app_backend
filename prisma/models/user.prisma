@@ -43,6 +43,7 @@ model User {
   institutionExams      InstitutionExam[]
   examAttempts          ExamAttempt[]
   authSession           AuthSession[]
+  profilePictureUploads ProfilePictureUpload[]
 
   @@index([platformRole])
   @@index([status])
@@ -81,4 +82,21 @@ model AuthRefreshToken {
 
   @@index([sessionId])
   @@map("auth_refresh_tokens")
+}
+
+model ProfilePictureUpload {
+  id          String   @id @db.Uuid
+  userId      String   @map("user_id") @db.Uuid
+  fileType    String   @map("file_type")
+  sizeBytes   Int      @map("size_bytes")
+  reference   Json
+  expiresAt   DateTime @map("expires_at") @db.Timestamptz
+  completedAt DateTime? @map("completed_at") @db.Timestamptz
+  isCurrent   Boolean  @default(false) @map("is_current")
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, isCurrent])
+  @@index([expiresAt])
+  @@map("profile_picture_uploads")
 }

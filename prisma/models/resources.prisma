@@ -33,7 +33,7 @@ model Resource {
   title            String               @db.VarChar(200)
   description      String               @db.Text
   ownerUserId      String?              @map("owner_user_id") @db.Uuid
-  ownerUser        User                 @relation("ResourceOwner", fields: [ownerUserId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  ownerUser        User?                @relation("ResourceOwner", fields: [ownerUserId], references: [id], onDelete: Restrict, onUpdate: Cascade)
   institutionId    String?              @map("institution_id") @db.Uuid
   uploadedByUserId String               @map("uploaded_by_user_id") @db.Uuid
   accessPolicy     ResourceAccessPolicy @map("access_policy")

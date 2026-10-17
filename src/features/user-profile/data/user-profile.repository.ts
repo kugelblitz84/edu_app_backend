@@ -46,15 +46,22 @@ export class PrismaUserProfileRepository implements UserProfileRepository {
     update: UpdateUserProfile,
   ): Promise<OwnUserProfile | null> {
     try {
-      const result = await this.prisma.user.updateMany({
-        where: { id: userId, status: 'ACTIVE', deletedAt: null },
-        data: update,
-      });
-      if (result.count === 0) return null;
-
-      return this.prisma.user.findUnique({
-        where: { id: userId },
-        select: ownProfileSelect,
+      return await this.prisma.$transaction(async (tx) => {
+        const result = await tx.user.updateMany({
+          where: { id: userId, status: 'ACTIVE', deletedAt: null },
+          data: update,
+        });
+        if (result.count === 0) return null;
+        if (update.avatarUrl !== undefined) {
+          await tx.profilePictureUpload.updateMany({
+            where: { userId, isCurrent: true },
+            data: { isCurrent: false },
+          });
+        }
+        return tx.user.findUnique({
+          where: { id: userId },
+          select: ownProfileSelect,
+        });
       });
     } catch (error) {
       if (

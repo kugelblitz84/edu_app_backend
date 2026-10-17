@@ -1,3 +1,4 @@
+import type { ProfilePictureUseCases } from './profile-picture.usecases';
 import { ConflictException, NotFoundException } from '@nestjs/common';
 import {
   UsernameConflictError,
@@ -47,7 +48,11 @@ describe('UserProfileUseCases', () => {
 
   beforeEach(() => {
     repository = new FakeUserProfileRepository();
-    useCases = new UserProfileUseCases(repository);
+    useCases = new UserProfileUseCases(repository, {
+      resolveAvatarUrl: jest.fn((_user: unknown, fallback: string | null) =>
+        Promise.resolve(fallback),
+      ),
+    } as unknown as ProfilePictureUseCases);
   });
 
   it('returns the authenticated user profile', async () => {

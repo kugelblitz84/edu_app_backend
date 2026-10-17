@@ -1,3 +1,7 @@
+import { StorageModule } from '../../core/storage/storage.module';
+import { ProfilePictureUseCases } from './domain/profile-picture.usecases';
+import { ProfilePictureRepository } from './domain/profile-picture.contracts';
+import { PrismaProfilePictureRepository } from './data/profile-picture.repository';
 import { Module } from '@nestjs/common';
 import { PrismaModule } from '../../core/database/prisma.module';
 import { PrismaUserProfileRepository } from './data/user-profile.repository';
@@ -9,9 +13,14 @@ import {
 } from './presentation/profile.controller';
 
 @Module({
-  imports: [PrismaModule],
+  imports: [PrismaModule, StorageModule],
   providers: [
     UserProfileUseCases,
+    ProfilePictureUseCases,
+    {
+      provide: ProfilePictureRepository,
+      useClass: PrismaProfilePictureRepository,
+    },
     { provide: UserProfileRepository, useClass: PrismaUserProfileRepository },
   ],
   controllers: [MeProfileController, PublicProfileController],

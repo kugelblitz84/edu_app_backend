@@ -35,3 +35,23 @@ export interface OwnProfileResponseDto extends PublicProfileResponseDto {
   id: string;
   email: string;
 }
+
+export const profilePictureUploadSchema = z
+  .object({
+    fileType: z.enum(['image/jpeg', 'image/png', 'image/webp']),
+    sizeBytes: z
+      .number()
+      .int()
+      .positive()
+      .max(5 * 1024 * 1024),
+  })
+  .strict();
+export type ProfilePictureUploadDto = z.infer<
+  typeof profilePictureUploadSchema
+>;
+export const completeProfilePictureSchema = z
+  .object({ fileId: z.uuid() })
+  .strict();
+export type CompleteProfilePictureDto = z.infer<
+  typeof completeProfilePictureSchema
+>;
