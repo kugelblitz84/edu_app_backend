@@ -7,6 +7,7 @@ import {
 import { Reflector } from '@nestjs/core';
 import type { Request } from 'express';
 import type { AuthenticatedRequest } from '../auth.types';
+import { OPTIONAL_AUTH_KEY } from '../decorators/optional-auth.decorator';
 import { IS_PUBLIC_KEY } from '../decorators/public.decorator';
 import { AccessTokenService } from '../services/access-token.service';
 import { SessionService } from '../services/session.service';
@@ -27,6 +28,11 @@ export class AccessTokenGuard implements CanActivate {
     if (isPublic) return true;
 
     const request = context.switchToHttp().getRequest<Request>();
+    const optional = this.reflector.getAllAndOverride<boolean>(
+      OPTIONAL_AUTH_KEY,
+      [context.getHandler(), context.getClass()],
+    );
+    if (optional && request.get('authorization') === undefined) return true;
     const match = request.get('authorization')?.match(/^Bearer ([^\s]+)$/i);
     if (!match || match[1].length > 4096) {
       throw new UnauthorizedException('A valid access token is required.');

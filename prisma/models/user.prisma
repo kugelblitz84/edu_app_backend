@@ -39,6 +39,13 @@ model User {
   reviewedInstitutions  Institution[]      @relation("InstitutionReviewer")
   institutionAdminships InstitutionAdmin[]
   ownedResources        Resource[]         @relation("ResourceOwner")
+  uploadedResources Resource[] @relation("ResourceUploader")
+  ownedResourceCollections ResourceCollection[] @relation("CollectionOwner")
+  createdResourceCollections ResourceCollection[] @relation("CollectionCreator")
+  resourceCollectionItems ResourceCollectionItem[]
+  resourceFiles ResourceFile[]
+  resourceUnlockGrants ResourceUnlockGrant[]
+  resourceCollectionUnlockGrants ResourceCollectionUnlockGrant[]
   personalExams         PersonalExam[]
   institutionExams      InstitutionExam[]
   examAttempts          ExamAttempt[]

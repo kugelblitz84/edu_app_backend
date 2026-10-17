@@ -11,7 +11,6 @@ enum ResourceAccessPolicy {
   OWNER_ONLY
   ENROLLED
   PURCHASE
-  // SUBSCRIPTION
 
   @@map("resource_access_policy")
 }
@@ -25,39 +24,186 @@ enum ResourceStatus {
   @@map("resource_status")
 }
 
-model Resource {
-  id               String               @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  type             ResourceType
-  publicURL        String               @map("public_url") @db.VarChar(200)
-  privateURL       String               @map("private_url") @db.VarChar(200)
-  title            String               @db.VarChar(200)
-  description      String               @db.Text
-  ownerUserId      String?              @map("owner_user_id") @db.Uuid
-  ownerUser        User?                @relation("ResourceOwner", fields: [ownerUserId], references: [id], onDelete: Restrict, onUpdate: Cascade)
-  institutionId    String?              @map("institution_id") @db.Uuid
-  uploadedByUserId String               @map("uploaded_by_user_id") @db.Uuid
-  accessPolicy     ResourceAccessPolicy @map("access_policy")
-  price            String?
-  collectionId     String?              @map("collection_id") @db.Uuid
-  status           ResourceStatus       @default(DRAFT)
-  metadata         Json?                @db.JsonB
-  createdAt        DateTime             @default(now()) @map("created_at") @db.Timestamptz
-  updatedAt        DateTime             @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
-  publishedAt      DateTime?            @map("published_at") @db.Timestamptz
+enum ResourceFilePurpose {
+  RESOURCE_CONTENT
+  RESOURCE_THUMBNAIL
+  COLLECTION_COVER
 
-  @@map("resources")
+  @@map("resource_file_purpose")
+}
+
+enum ResourceUploadState {
+  PENDING
+  READY
+  REJECTED
+
+  @@map("resource_upload_state")
+}
+
+enum ResourceCleanupState {
+  NONE
+  QUEUED
+  DONE
+
+  @@map("resource_cleanup_state")
+}
+
+// Legacy resources/ResourceCollection tables are preserved for staged backfill.
+model Resource {
+  id               String                   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  type             ResourceType
+  title            String                   @db.VarChar(200)
+  description      String?                  @db.Text
+  ownerUserId      String                   @map("owner_user_id") @db.Uuid
+  ownerUser        User                     @relation("ResourceOwner", fields: [ownerUserId], references: [id], onDelete: Restrict)
+  uploadedByUserId String                   @map("uploaded_by_user_id") @db.Uuid
+  uploadedByUser   User                     @relation("ResourceUploader", fields: [uploadedByUserId], references: [id], onDelete: Restrict)
+  institutionId    String?                  @map("institution_id") @db.Uuid
+  institution      Institution?             @relation(fields: [institutionId], references: [id], onDelete: Restrict)
+  accessPolicy     ResourceAccessPolicy     @map("access_policy")
+  status           ResourceStatus           @default(DRAFT)
+  isStandalone     Boolean                  @default(true) @map("is_standalone")
+  priceAmountMinor Int?                     @map("price_amount_minor")
+  currency         String?                  @db.VarChar(3)
+  pinHash          String?                  @map("pin_hash")
+  unlockVersion    Int                      @default(1) @map("unlock_version")
+  version          Int                      @default(1)
+  metadata         Json?                    @db.JsonB
+  createdAt        DateTime                 @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt        DateTime                 @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
+  publishedAt      DateTime?                @map("published_at") @db.Timestamptz
+  archivedAt       DateTime?                @map("archived_at") @db.Timestamptz
+  deletedAt        DateTime?                @map("deleted_at") @db.Timestamptz
+  files            ResourceFile[]
+  items            ResourceCollectionItem[]
+  grants           ResourceUnlockGrant[]
+
+  @@index([ownerUserId, status, createdAt, id])
+  @@index([institutionId, status, createdAt, id])
+  @@index([status, isStandalone, accessPolicy, createdAt, id])
+  @@map("study_resources")
 }
 
 model ResourceCollection {
-  id           String               @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  title        String               @db.VarChar(200)
-  description  String?              @db.Text
-  //isPaid       boolean              @default("False")
-  accessPolicy ResourceAccessPolicy @map("access_policy")
-  status       ResourceStatus       @default(DRAFT)
-  metadata     Json?                @db.JsonB
-  createdAt    DateTime             @default(now()) @map("created_at") @db.Timestamptz
-  updatedAt    DateTime             @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
-  publishedAt  DateTime?            @map("published_at") @db.Timestamptz
-  price        String?
+  id               String                          @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  title            String                          @db.VarChar(200)
+  description      String?                         @db.Text
+  ownerUserId      String                          @map("owner_user_id") @db.Uuid
+  ownerUser        User                            @relation("CollectionOwner", fields: [ownerUserId], references: [id], onDelete: Restrict)
+  createdByUserId  String                          @map("created_by_user_id") @db.Uuid
+  createdByUser    User                            @relation("CollectionCreator", fields: [createdByUserId], references: [id], onDelete: Restrict)
+  institutionId    String?                         @map("institution_id") @db.Uuid
+  institution      Institution?                    @relation(fields: [institutionId], references: [id], onDelete: Restrict)
+  accessPolicy     ResourceAccessPolicy            @map("access_policy")
+  status           ResourceStatus                  @default(DRAFT)
+  priceAmountMinor Int?                            @map("price_amount_minor")
+  currency         String?                         @db.VarChar(3)
+  pinHash          String?                         @map("pin_hash")
+  unlockVersion    Int                             @default(1) @map("unlock_version")
+  version          Int                             @default(1)
+  metadata         Json?                           @db.JsonB
+  createdAt        DateTime                        @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt        DateTime                        @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
+  publishedAt      DateTime?                       @map("published_at") @db.Timestamptz
+  archivedAt       DateTime?                       @map("archived_at") @db.Timestamptz
+  deletedAt        DateTime?                       @map("deleted_at") @db.Timestamptz
+  files            ResourceFile[]
+  items            ResourceCollectionItem[]
+  grants           ResourceCollectionUnlockGrant[]
+
+  @@index([ownerUserId, status, createdAt, id])
+  @@index([institutionId, status, createdAt, id])
+  @@index([status, accessPolicy, createdAt, id])
+  @@map("resource_collections")
+}
+
+model ResourceCollectionItem {
+  collectionId  String             @map("collection_id") @db.Uuid
+  resourceId    String             @map("resource_id") @db.Uuid
+  position      Int
+  addedByUserId String             @map("added_by_user_id") @db.Uuid
+  addedAt       DateTime           @default(now()) @map("added_at") @db.Timestamptz
+  collection    ResourceCollection @relation(fields: [collectionId], references: [id], onDelete: Cascade)
+  resource      Resource           @relation(fields: [resourceId], references: [id], onDelete: Restrict)
+  addedByUser   User               @relation(fields: [addedByUserId], references: [id], onDelete: Restrict)
+
+  @@id([collectionId, resourceId])
+  @@unique([collectionId, position])
+  @@index([resourceId])
+  @@map("resource_collection_items")
+}
+
+model ResourceFile {
+  id                String               @id @db.Uuid
+  uploaderUserId    String               @map("uploader_user_id") @db.Uuid
+  uploaderUser      User                 @relation(fields: [uploaderUserId], references: [id], onDelete: Restrict)
+  resourceId        String?              @map("resource_id") @db.Uuid
+  resource          Resource?            @relation(fields: [resourceId], references: [id], onDelete: Restrict)
+  collectionId      String?              @map("collection_id") @db.Uuid
+  collection        ResourceCollection?  @relation(fields: [collectionId], references: [id], onDelete: Restrict)
+  purpose           ResourceFilePurpose
+  fileType          String               @map("file_type")
+  sizeBytes         Int                  @map("size_bytes")
+  reference         Json                 @db.JsonB
+  verifiedReference Json?                @map("verified_reference") @db.JsonB
+  verifiedSizeBytes Int?                 @map("verified_size_bytes")
+  expiresAt         DateTime             @map("expires_at") @db.Timestamptz
+  completedAt       DateTime?            @map("completed_at") @db.Timestamptz
+  state             ResourceUploadState  @default(PENDING)
+  attached          Boolean              @default(false)
+  cleanupState      ResourceCleanupState @default(NONE) @map("cleanup_state")
+  createdAt         DateTime             @default(now()) @map("created_at") @db.Timestamptz
+  cleanupJob        ResourceCleanupJob?
+
+  @@index([resourceId, attached])
+  @@index([collectionId, attached])
+  @@index([uploaderUserId, state, expiresAt])
+  @@index([state, expiresAt])
+  @@map("resource_files")
+}
+
+model ResourceUnlockGrant {
+  resourceId    String    @map("resource_id") @db.Uuid
+  userId        String    @map("user_id") @db.Uuid
+  resource      Resource  @relation(fields: [resourceId], references: [id], onDelete: Cascade)
+  user          User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  source        String    @default("PIN")
+  unlockVersion Int       @map("unlock_version")
+  grantedAt     DateTime  @default(now()) @map("granted_at") @db.Timestamptz
+  expiresAt     DateTime? @map("expires_at") @db.Timestamptz
+  revokedAt     DateTime? @map("revoked_at") @db.Timestamptz
+
+  @@id([resourceId, userId])
+  @@index([userId])
+  @@map("resource_unlock_grants")
+}
+
+model ResourceCollectionUnlockGrant {
+  collectionId  String             @map("collection_id") @db.Uuid
+  userId        String             @map("user_id") @db.Uuid
+  collection    ResourceCollection @relation(fields: [collectionId], references: [id], onDelete: Cascade)
+  user          User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+  source        String             @default("PIN")
+  unlockVersion Int                @map("unlock_version")
+  grantedAt     DateTime           @default(now()) @map("granted_at") @db.Timestamptz
+  expiresAt     DateTime?          @map("expires_at") @db.Timestamptz
+  revokedAt     DateTime?          @map("revoked_at") @db.Timestamptz
+
+  @@id([collectionId, userId])
+  @@index([userId])
+  @@map("resource_collection_unlock_grants")
+}
+
+model ResourceCleanupJob {
+  fileId        String       @id @map("file_id") @db.Uuid
+  file          ResourceFile @relation(fields: [fileId], references: [id], onDelete: Restrict)
+  nextAttemptAt DateTime     @map("next_attempt_at") @db.Timestamptz
+  claimedAt     DateTime?    @map("claimed_at") @db.Timestamptz
+  claimToken    String?      @map("claim_token") @db.Uuid
+  attempts      Int          @default(0)
+  completedAt   DateTime?    @map("completed_at") @db.Timestamptz
+  lastError     String?      @map("last_error") @db.VarChar(100)
+
+  @@index([completedAt, nextAttemptAt, claimedAt])
+  @@map("resource_cleanup_jobs")
 }

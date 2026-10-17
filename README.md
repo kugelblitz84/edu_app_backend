@@ -86,11 +86,9 @@ The API exposes:
 Configure the HTTPS frontend reset URL and SMTP settings shown in
 `.env.example`. The region header must be injected by a trusted edge proxy
 (Cloudflare's `CF-IPCountry` by default), and the application origin must not
-be directly reachable by clients. Apply database migrations before deployment:
-
-```bash
-npx prisma migrate deploy
-```
+be directly reachable by clients. Apply the reviewed manual SQL updates before deployment. This repository has no
+Prisma migration history; migrate deploy does not apply prisma/updates files.
+See the [study materials migration sequence](prisma/study-materials/README.md).
 
 ## Add a feature
 
@@ -119,3 +117,11 @@ not need artificial entities or repository abstractions.
 Database ORM, authentication, authorization, Redis, queues, Swagger, structured
 logging, and third-party integrations are not selected yet. Add them when their
 requirements are confirmed rather than locking the project into premature choices.
+
+## Study materials
+
+Resources, ordered collections, verified direct uploads, enrollment/PIN access and
+durable cleanup are implemented in Resources. See the [API and frontend guide](src/features/Resources/README.md),
+[additive migration/backfill instructions](prisma/study-materials/README.md), and
+[verification report](src/features/Resources/VERIFICATION.md). Configure the signed
+Cloudinary preset and apply the additive SQL before enabling these routes.

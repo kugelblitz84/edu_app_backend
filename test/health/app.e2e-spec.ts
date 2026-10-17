@@ -1,3 +1,5 @@
+import { CLOUDINARY_CONFIG } from '../../src/core/storage/config/cloudinary.config';
+import { MaterialCleanupWorker } from '../../src/features/Resources/data/material-cleanup.worker';
 import { INestApplication, VersioningType } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
 import request from 'supertest';
@@ -14,6 +16,16 @@ describe('Application (e2e)', () => {
     const moduleFixture: TestingModule = await Test.createTestingModule({
       imports: [AppModule],
     })
+      .overrideProvider(CLOUDINARY_CONFIG)
+      .useValue({
+        cloudName: 'test',
+        apiKey: 'test',
+        apiSecret: 'test',
+        uploadPreset: 'test',
+        maxUploadBytes: 10485760,
+      })
+      .overrideProvider(MaterialCleanupWorker)
+      .useValue({})
       .overrideProvider(PrismaService)
       .useValue({})
       .overrideProvider(MongooseService)

@@ -31,6 +31,8 @@ model Institution {
   admins            InstitutionAdmin[]
   exams             InstitutionExam[]
   enrollments       Enrollment[]
+  resources Resource[]
+  resourceCollections ResourceCollection[]
   archivedAt        DateTime?                 @map("archived_at") @db.Timestamptz
   reviewVerdict     InstitutionReviewVerdict? @map("review_verdict")
   respondedByUserId String?                   @map("responded_by_user_id") @db.Uuid

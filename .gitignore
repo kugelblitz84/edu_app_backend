@@ -55,5 +55,7 @@ pids
 # Diagnostic reports (https://nodejs.org/api/report.html)
 report.[0-9]*.[0-9]*.[0-9]*.[0-9]*.json
 
+study_materials_implementation_prompt.md
+
 
 # edu_app_sadi.sql
