@@ -1,19 +1,16 @@
 import { Module } from '@nestjs/common';
-import { CloudinaryStorageProviderService } from './data/storage_provider_service.cloudinary.impl';
+import { CloudinaryStorageProviderService } from './data/cloudinary/cloudinary-storage-provider.service';
 import {
   CLOUDINARY_CONFIG,
   loadCloudinaryConfig,
-} from './domain/storage_provider.config';
+} from './config/cloudinary.config';
 import { StorageProvider } from './domain/contracts';
 
 @Module({
   providers: [
     { provide: CLOUDINARY_CONFIG, useFactory: loadCloudinaryConfig },
-    {
-      provide: StorageProvider,
-      useClass: CloudinaryStorageProviderService,
-    },
+    { provide: StorageProvider, useClass: CloudinaryStorageProviderService },
   ],
   exports: [StorageProvider],
 })
-export class StorageProviderModule {}
+export class StorageModule {}
