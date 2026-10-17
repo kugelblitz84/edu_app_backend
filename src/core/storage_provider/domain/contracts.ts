@@ -1,33 +1,18 @@
-export type StorageResourceType = 'image' | 'video' | 'raw';
+import type {
+  UploadInputDto,
+  UploadUrlResponseDto,
+  StorageReferenceDto,
+  StorageObject,
+  ReadAccessUrlResponseDto,
+} from '../presentation/storage_service.dto';
 
-export interface UploadStorageObject {
-  data: Buffer;
-  resourceType: StorageResourceType;
-  /** Optional namespace within the provider. */
-  folder?: string;
-}
-
-export interface StorageObjectReference {
-  /** Opaque provider key. Persist this together with resourceType for deletion. */
-  key: string;
-  resourceType: StorageResourceType;
-}
-
-export interface StoredStorageObject extends StorageObjectReference {
-  url: string;
-  sizeBytes: number;
-  format?: string;
-}
-
-export interface DeleteStorageObjectResult {
-  deleted: boolean;
-}
-
-/** Inject this contract; provider selection belongs in StorageProviderModule. */
-export abstract class StorageProviderService {
-  abstract upload(input: UploadStorageObject): Promise<StoredStorageObject>;
-  /** Missing objects return deleted: false, allowing safe retries. */
-  abstract delete(
-    input: StorageObjectReference,
-  ): Promise<DeleteStorageObjectResult>;
+export abstract class StorageProvider {
+  abstract createUploadUrl(
+    input: UploadInputDto,
+  ): Promise<UploadUrlResponseDto>; //frontend request for an upload url
+  abstract inspect(reference: StorageReferenceDto): Promise<StorageObject>; //after successfull upload front end hits this so that backend can check and verify
+  abstract createReadAccessUrl(
+    reference: StorageReferenceDto,
+  ): Promise<ReadAccessUrlResponseDto>; //read uploaded files
+  abstract delete(reference: StorageReferenceDto): Promise<void>; //delete uploaded files
 }

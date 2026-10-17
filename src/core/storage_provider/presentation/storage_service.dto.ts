@@ -1,33 +1,45 @@
 import { z } from 'zod';
-import type {
-  DeleteStorageObjectResult,
-  StoredStorageObject,
-} from '../domain/contracts';
 
 export const storageResourceTypeSchema = z.enum(['image', 'video', 'raw']);
 
-export const uploadStorageObjectSchema = z
+export const uploadInputSchema = z
   .object({
-    data: z.instanceof(Buffer).refine((data) => data.length > 0, {
-      message: 'File data must not be empty.',
-    }),
     resourceType: storageResourceTypeSchema,
     folder: z.string().trim().min(1).max(255).optional(),
   })
   .strict();
 
-export const deleteStorageObjectSchema = z
+export const storageReferenceSchema = z
   .object({
     key: z.string().trim().min(1),
     resourceType: storageResourceTypeSchema,
   })
   .strict();
 
-export type UploadStorageObjectRequestDto = z.infer<
-  typeof uploadStorageObjectSchema
->;
-export type DeleteStorageObjectRequestDto = z.infer<
-  typeof deleteStorageObjectSchema
->;
-export type UploadStorageObjectResponseDto = StoredStorageObject;
-export type DeleteStorageObjectResponseDto = DeleteStorageObjectResult;
+export type UploadInputDto = z.infer<typeof uploadInputSchema>;
+export type StorageReferenceDto = z.infer<typeof storageReferenceSchema>;
+
+export interface UploadUrlResponseDto {
+  url: string;
+  method: 'POST';
+  /** Send these fields together with the file in a multipart/form-data request. */
+  fields: Record<string, string>;
+  reference: StorageReferenceDto;
+  /** Cloudinary upload signatures are valid for one hour from their timestamp. */
+  expiresAt: number;
+}
+
+export interface StorageObject {
+  reference: StorageReferenceDto;
+  sizeBytes: number;
+  format?: string;
+  width?: number;
+  height?: number;
+  durationSeconds?: number;
+}
+
+export interface ReadAccessUrlResponseDto {
+  url: string;
+  /** Unix timestamp in seconds. */
+  expiresAt: number;
+}

@@ -4,16 +4,16 @@ import {
   CLOUDINARY_CONFIG,
   loadCloudinaryConfig,
 } from './domain/storage_provider.config';
-import { StorageProviderService } from './domain/contracts';
+import { StorageProvider } from './domain/contracts';
 
 @Module({
   providers: [
     { provide: CLOUDINARY_CONFIG, useFactory: loadCloudinaryConfig },
     {
-      provide: StorageProviderService,
+      provide: StorageProvider,
       useClass: CloudinaryStorageProviderService,
     },
   ],
-  exports: [StorageProviderService],
+  exports: [StorageProvider],
 })
 export class StorageProviderModule {}

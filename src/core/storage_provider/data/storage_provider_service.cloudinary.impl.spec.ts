@@ -1,130 +1,129 @@
-import { PassThrough } from 'node:stream';
 import { v2 as cloudinary } from 'cloudinary';
 import { CloudinaryStorageProviderService } from './storage_provider_service.cloudinary.impl';
-import { loadCloudinaryConfig } from '../domain/storage_provider.config';
 
 jest.mock('cloudinary', () => ({
-  v2: { uploader: { upload_stream: jest.fn(), destroy: jest.fn() } },
+  v2: {
+    utils: { api_sign_request: jest.fn(), private_download_url: jest.fn() },
+    api: { resource: jest.fn() },
+    uploader: { destroy: jest.fn() },
+  },
 }));
 
 describe('CloudinaryStorageProviderService', () => {
   const config = {
     cloudName: 'test-cloud',
-    apiKey: 'test-key',
-    apiSecret: 'test-secret',
+    apiKey: 'key',
+    apiSecret: 'secret',
   };
   const service = new CloudinaryStorageProviderService(config);
-  const uploadStream = jest.mocked(cloudinary.uploader.upload_stream);
-  const destroy = jest.mocked(cloudinary.uploader.destroy);
-
+  const reference = { key: 'docs/file', resourceType: 'raw' as const };
+  const resource = {
+    public_id: reference.key,
+    resource_type: 'raw',
+    type: 'authenticated',
+    bytes: 123,
+    format: 'pdf',
+  };
   beforeEach(() => jest.resetAllMocks());
 
-  it('streams bytes and maps provider metadata to a storage object', async () => {
-    const stream = new PassThrough();
-    const data = Buffer.from('file');
-    uploadStream.mockReturnValue(stream);
-    const pending = service.upload({
-      data,
+  it('returns signed multipart upload fields and the future reference', async () => {
+    jest.mocked(cloudinary.utils.api_sign_request).mockReturnValue('signature');
+    const result = await service.createUploadUrl({
       resourceType: 'raw',
       folder: 'docs',
     });
-    expect(stream.read()).toEqual(data);
-    expect(uploadStream.mock.calls[0][0]).toMatchObject({
-      cloud_name: config.cloudName,
-      api_key: config.apiKey,
-      api_secret: config.apiSecret,
-      resource_type: 'raw',
-      folder: 'docs',
-      overwrite: false,
+    expect(result.url).toBe(
+      'https://api.cloudinary.com/v1_1/test-cloud/raw/upload',
+    );
+    expect(result.reference.key).toMatch(/^docs\//);
+    expect(result.fields).toMatchObject({
+      public_id: result.reference.key,
+      type: 'authenticated',
+      overwrite: 'false',
+      api_key: 'key',
+      signature: 'signature',
     });
-    const callback = uploadStream.mock.calls[0][1]!;
-    callback(undefined, {
-      public_id: 'docs/file.pdf',
-      secure_url: 'https://example.com/file.pdf',
-      bytes: 4,
+    expect(cloudinary.utils.api_sign_request).toHaveBeenCalledWith(
+      {
+        public_id: result.reference.key,
+        timestamp: Number(result.fields.timestamp),
+        type: 'authenticated',
+        overwrite: false,
+      },
+      config.apiSecret,
+    );
+    expect(result.expiresAt).toBe(Number(result.fields.timestamp) + 3600);
+    expect(JSON.stringify(result)).not.toContain(config.apiSecret);
+  });
+
+  it('inspects provider metadata', async () => {
+    jest.mocked(cloudinary.api.resource).mockResolvedValue(resource);
+    await expect(service.inspect(reference)).resolves.toMatchObject({
+      reference,
+      sizeBytes: 123,
       format: 'pdf',
     });
-    await expect(pending).resolves.toEqual({
-      key: 'docs/file.pdf',
-      resourceType: 'raw',
-      url: 'https://example.com/file.pdf',
-      sizeBytes: 4,
-      format: 'pdf',
-    });
-  });
-
-  it('rejects empty input before contacting the provider', async () => {
-    await expect(
-      service.upload({ data: Buffer.alloc(0), resourceType: 'image' }),
-    ).rejects.toThrow('non-empty Buffer');
-    expect(uploadStream).not.toHaveBeenCalled();
-  });
-
-  it('rejects provider errors', async () => {
-    uploadStream.mockReturnValue(new PassThrough());
-    const pending = service.upload({
-      data: Buffer.from('file'),
-      resourceType: 'image',
-    });
-    uploadStream.mock.calls[0][1]!({
-      message: 'failed',
-      name: 'Error',
-      http_code: 500,
-    });
-    await expect(pending).rejects.toThrow('Cloudinary upload failed');
-  });
-
-  it('rejects stream errors', async () => {
-    const stream = new PassThrough();
-    uploadStream.mockReturnValue(stream);
-    const pending = service.upload({
-      data: Buffer.from('file'),
-      resourceType: 'image',
-    });
-    stream.emit('error', new Error('connection closed'));
-    await expect(pending).rejects.toThrow('upload stream failed');
-  });
-
-  it.each([
-    ['ok', true],
-    ['not found', false],
-  ])('handles deletion result %s', async (result, deleted) => {
-    destroy.mockResolvedValue({ result });
-    await expect(
-      service.delete({ key: 'video-id', resourceType: 'video' }),
-    ).resolves.toEqual({ deleted });
-    expect(destroy).toHaveBeenCalledWith(
-      'video-id',
-      expect.objectContaining({ resource_type: 'video', invalidate: true }),
+    expect(cloudinary.api.resource).toHaveBeenCalledWith(
+      reference.key,
+      expect.objectContaining({ resource_type: 'raw', type: 'authenticated' }),
     );
   });
 
-  it('rejects unexpected deletion results', async () => {
-    destroy.mockResolvedValue({ result: 'error' });
-    await expect(
-      service.delete({ key: 'id', resourceType: 'image' }),
-    ).rejects.toThrow('deletion failed');
-  });
-});
-
-describe('loadCloudinaryConfig', () => {
-  const originalEnv = process.env;
-  beforeEach(() => {
-    process.env = { ...originalEnv };
-  });
-  afterEach(() => {
-    process.env = originalEnv;
+  it('rejects unexpected provider references', async () => {
+    jest
+      .mocked(cloudinary.api.resource)
+      .mockResolvedValue({ ...resource, public_id: 'different' });
+    await expect(service.inspect(reference)).rejects.toThrow(
+      'unexpected storage object',
+    );
   });
 
-  it('requires credentials', () => {
-    delete process.env.CLOUDINARY_API_SECRET;
-    expect(() => loadCloudinaryConfig()).toThrow('CLOUDINARY_API_SECRET');
+  it('propagates missing object errors from inspection', async () => {
+    jest
+      .mocked(cloudinary.api.resource)
+      .mockRejectedValue(new Error('not found'));
+    await expect(service.inspect(reference)).rejects.toThrow('not found');
   });
 
-  it('uses the supplied cloud as the default', () => {
-    delete process.env.CLOUDINARY_CLOUD_NAME;
-    process.env.CLOUDINARY_API_KEY = 'key';
-    process.env.CLOUDINARY_API_SECRET = 'secret';
-    expect(loadCloudinaryConfig().cloudName).toBe('dixczgeem');
+  it('creates expiring read access for an authenticated object', async () => {
+    jest.mocked(cloudinary.api.resource).mockResolvedValue(resource);
+    jest
+      .mocked(cloudinary.utils.private_download_url)
+      .mockReturnValue('https://example.com/signed');
+    const result = await service.createReadAccessUrl(reference);
+    expect(result.url).toBe('https://example.com/signed');
+    expect(cloudinary.utils.private_download_url).toHaveBeenCalledWith(
+      reference.key,
+      'pdf',
+      expect.objectContaining({
+        resource_type: 'raw',
+        type: 'authenticated',
+        expires_at: result.expiresAt,
+        attachment: false,
+      }),
+    );
+  });
+
+  it.each(['ok', 'not found'])(
+    'resolves deletion with result %s',
+    async (result) => {
+      jest.mocked(cloudinary.uploader.destroy).mockResolvedValue({ result });
+      await expect(service.delete(reference)).resolves.toBeUndefined();
+      expect(cloudinary.uploader.destroy).toHaveBeenCalledWith(
+        reference.key,
+        expect.objectContaining({
+          resource_type: 'raw',
+          type: 'authenticated',
+          invalidate: true,
+        }),
+      );
+    },
+  );
+
+  it('rejects failed deletion', async () => {
+    jest
+      .mocked(cloudinary.uploader.destroy)
+      .mockResolvedValue({ result: 'error' });
+    await expect(service.delete(reference)).rejects.toThrow('deletion failed');
   });
 });
