@@ -7,11 +7,13 @@ import { APP_CONFIG, type AppConfig } from '../../../config/app-config';
 import { Inject } from '@nestjs/common';
 import {
   PaymentGateway,
-  type CreatePaymentInput,
-  type PaymentNotification,
-  type PaymentStatus,
-  type PaymentSession,
 } from '../domain/payment.contracts';
+import type {
+  CreatePaymentInput,
+  PaymentNotification,
+  PaymentStatus,
+  PaymentSession,
+} from '../domain/payment.types';
 
 const API_ROOT = 'https://sandbox.sslcommerz.com';
 const LIVE_API_ROOT = 'https://securepay.sslcommerz.com';

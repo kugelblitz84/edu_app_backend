@@ -1,10 +1,10 @@
 import { BadRequestException, Injectable } from '@nestjs/common';
-import {
-  PaymentGateway,
-  type CreatePaymentInput,
-  type PaymentNotification,
-  type PaymentSession,
-} from './payment.contracts';
+import { PaymentGateway } from './payment.contracts';
+import type {
+  CreatePaymentInput,
+  PaymentNotification,
+  PaymentSession,
+} from './payment.types';
 
 @Injectable()
 export class PaymentUseCases {
