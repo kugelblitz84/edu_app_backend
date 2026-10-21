@@ -13,13 +13,13 @@ import { randomUUID } from 'node:crypto';
 import { RateLimitService } from '../../../core/auth/services/rate-limit.service';
 import { ScryptSecretHasher } from '../../../core/security/scrypt-secret-hasher.service';
 import { ScryptSecretVerifier } from '../../../core/security/scrypt-secret-verifier.service';
-import { StorageProvider } from '../../../core/storage/domain/contracts';
-import { StorageError } from '../../../core/storage/domain/storage.errors';
+import { StorageProvider } from '../../../core/modules/storage/domain/contracts';
+import { StorageError } from '../../../core/modules/storage/domain/storage.errors';
 import type {
   StorageObject,
   StorageFileType,
-} from '../../../core/storage/domain/storage.types';
-import { toUploadUrlResponseDto } from '../../../core/storage/presentation/storage.dto';
+} from '../../../core/modules/storage/domain/storage.types';
+import { toUploadUrlResponseDto } from '../../../core/modules/storage/presentation/storage.dto';
 import {
   access,
   compatible,

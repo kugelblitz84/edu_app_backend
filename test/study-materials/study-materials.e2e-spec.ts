@@ -17,7 +17,7 @@ import { loadAppConfig } from '../../src/core/config/app-config';
 import { PrismaService } from '../../src/core/database/prisma.service';
 import { ScryptSecretHasher } from '../../src/core/security/scrypt-secret-hasher.service';
 import { ScryptSecretVerifier } from '../../src/core/security/scrypt-secret-verifier.service';
-import type { StorageReference } from '../../src/core/storage/domain/storage.types';
+import type { StorageReference } from '../../src/core/modules/storage/domain/storage.types';
 import { loadMaterialConfig } from '../../src/features/Resources/application/material.config';
 import { MaterialService } from '../../src/features/Resources/application/material.service';
 import { MaterialCleanupWorker } from '../../src/features/Resources/data/material-cleanup.worker';

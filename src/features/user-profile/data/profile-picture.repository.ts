@@ -6,7 +6,7 @@ import {
 import { Prisma } from '@prisma/client';
 import { z } from 'zod';
 import { PrismaService } from '../../../core/database/prisma.service';
-import type { StorageReference } from '../../../core/storage/domain/storage.types';
+import type { StorageReference } from '../../../core/modules/storage/domain/storage.types';
 import {
   ProfilePictureRepository,
   type ProfilePictureUpload,

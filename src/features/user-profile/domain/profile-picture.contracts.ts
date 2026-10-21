@@ -1,4 +1,4 @@
-import type { StorageReference } from '../../../core/storage/domain/storage.types';
+import type { StorageReference } from '../../../core/modules/storage/domain/storage.types';
 
 export interface ProfilePictureUpload {
   id: string;

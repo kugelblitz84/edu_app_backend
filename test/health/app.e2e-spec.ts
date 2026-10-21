@@ -1,4 +1,4 @@
-import { CLOUDINARY_CONFIG } from '../../src/core/storage/config/cloudinary.config';
+import { CLOUDINARY_CONFIG } from '../../src/core/modules/storage/config/cloudinary.config';
 import { MaterialCleanupWorker } from '../../src/features/Resources/data/material-cleanup.worker';
 import { INestApplication, VersioningType } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';

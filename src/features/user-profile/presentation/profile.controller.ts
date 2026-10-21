@@ -2,7 +2,7 @@ import { ProfilePictureUseCases } from '../domain/profile-picture.usecases';
 import {
   toUploadUrlResponseDto,
   type UploadUrlResponseDto,
-} from '../../../core/storage/presentation/storage.dto';
+} from '../../../core/modules/storage/presentation/storage.dto';
 import {
   profilePictureUploadSchema,
   completeProfilePictureSchema,

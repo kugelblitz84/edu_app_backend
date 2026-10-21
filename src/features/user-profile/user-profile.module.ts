@@ -1,4 +1,4 @@
-import { StorageModule } from '../../core/storage/storage.module';
+import { StorageModule } from '../../core/modules/storage/storage.module';
 import { ProfilePictureUseCases } from './domain/profile-picture.usecases';
 import { ProfilePictureRepository } from './domain/profile-picture.contracts';
 import { PrismaProfilePictureRepository } from './data/profile-picture.repository';

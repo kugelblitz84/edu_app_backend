@@ -2,7 +2,7 @@ import { Module } from '@nestjs/common';
 import { PrismaModule } from '../../core/database/prisma.module';
 import { ScryptSecretHasher } from '../../core/security/scrypt-secret-hasher.service';
 import { ScryptSecretVerifier } from '../../core/security/scrypt-secret-verifier.service';
-import { StorageModule } from '../../core/storage/storage.module';
+import { StorageModule } from '../../core/modules/storage/storage.module';
 import {
   MATERIAL_CONFIG,
   loadMaterialConfig,

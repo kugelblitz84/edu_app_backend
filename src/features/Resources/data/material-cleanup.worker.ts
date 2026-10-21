@@ -8,8 +8,8 @@ import {
 import { Prisma } from '@prisma/client';
 import { randomUUID } from 'node:crypto';
 import { PrismaService } from '../../../core/database/prisma.service';
-import { StorageProvider } from '../../../core/storage/domain/contracts';
-import { StorageError } from '../../../core/storage/domain/storage.errors';
+import { StorageProvider } from '../../../core/modules/storage/domain/contracts';
+import { StorageError } from '../../../core/modules/storage/domain/storage.errors';
 import {
   MATERIAL_CONFIG,
   type MaterialConfig,
