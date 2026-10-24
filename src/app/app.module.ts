@@ -10,6 +10,7 @@ import { HealthModule } from '../features/health/health.module';
 import { InstitutionModule } from '../features/institutions/institution.module';
 import { ResourceModule } from '../features/Resources/resource.module';
 import { UserProfileModule } from '../features/user-profile/user-profile.module';
+import { PaymentModule } from '../core/modules/payment/payment.module';
 
 @Module({
   imports: [
@@ -23,6 +24,7 @@ import { UserProfileModule } from '../features/user-profile/user-profile.module'
     ExamModule,
     UserProfileModule,
     ResourceModule,
+    PaymentModule,
     ArticleModule,
   ],
 })

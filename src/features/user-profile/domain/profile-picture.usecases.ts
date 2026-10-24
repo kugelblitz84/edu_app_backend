@@ -8,12 +8,12 @@ import {
   NotFoundException,
   ServiceUnavailableException,
 } from '@nestjs/common';
-import { StorageProvider } from '../../../core/storage/domain/contracts';
-import { StorageError } from '../../../core/storage/domain/storage.errors';
+import { StorageProvider } from '../../../core/modules/storage/domain/contracts';
+import { StorageError } from '../../../core/modules/storage/domain/storage.errors';
 import type {
   UploadInput,
   UploadUrlResponse,
-} from '../../../core/storage/domain/storage.types';
+} from '../../../core/modules/storage/domain/storage.types';
 import { ProfilePictureRepository } from './profile-picture.contracts';
 
 export const PROFILE_PICTURE_MAX_BYTES = 5 * 1024 * 1024;

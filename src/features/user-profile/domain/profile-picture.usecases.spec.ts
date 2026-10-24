@@ -9,9 +9,9 @@ import {
   NotFoundException,
   ServiceUnavailableException,
 } from '@nestjs/common';
-import { StorageError } from '../../../core/storage/domain/storage.errors';
-import type { StorageProvider } from '../../../core/storage/domain/contracts';
-import type { UploadUrlResponse } from '../../../core/storage/domain/storage.types';
+import { StorageError } from '../../../core/modules/storage/domain/storage.errors';
+import type { StorageProvider } from '../../../core/modules/storage/domain/contracts';
+import type { UploadUrlResponse } from '../../../core/modules/storage/domain/storage.types';
 import { ProfilePictureUseCases } from './profile-picture.usecases';
 import type {
   ProfilePictureRepository,

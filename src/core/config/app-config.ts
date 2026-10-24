@@ -32,6 +32,15 @@ export interface AppConfig {
     password?: string;
     from: string;
   };
+  payment: {
+    sslCommerzStoreId?: string;
+    sslCommerzStorePassword?: string;
+    sslCommerzIsLive: boolean;
+    successUrl?: string;
+    failureUrl?: string;
+    cancelledUrl?: string;
+    ipnUrl?: string;
+  };
   passwordHashing: {
     keyLength: number;
     cost: number;
@@ -253,6 +262,15 @@ export function loadAppConfig(): AppConfig {
       user: process.env.SMTP_USER?.trim() || undefined,
       password: process.env.SMTP_PASSWORD,
       from: process.env.MAIL_FROM?.trim() || 'no-reply@edu-app.local',
+    },
+    payment: {
+      sslCommerzStoreId: process.env.SSLCOMMERZ_STORE_ID?.trim() || undefined,
+      sslCommerzStorePassword: process.env.SSLCOMMERZ_STORE_PASSWORD || undefined,
+      sslCommerzIsLive: process.env.SSLCOMMERZ_IS_LIVE === 'true',
+      successUrl: process.env.PAYMENT_SUCCESS_URL?.trim() || undefined,
+      failureUrl: process.env.PAYMENT_FAILURE_URL?.trim() || undefined,
+      cancelledUrl: process.env.PAYMENT_CANCELLED_URL?.trim() || undefined,
+      ipnUrl: process.env.PAYMENT_IPN_URL?.trim() || undefined,
     },
     passwordHashing: {
       keyLength: parseIntegerInRange(

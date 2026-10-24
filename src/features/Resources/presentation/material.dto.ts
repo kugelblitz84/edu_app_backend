@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { STORAGE_FILE_TYPES } from '../../../core/storage/domain/storage.types';
+import { STORAGE_FILE_TYPES } from '../../../core/modules/storage/domain/storage.types';
 
 export const policySchema = z.enum([
   'FREE',
