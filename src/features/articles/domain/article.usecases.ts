@@ -7,40 +7,37 @@ import {
 } from '@nestjs/common';
 import { randomUUID } from 'node:crypto';
 import type { AuthenticatedUser } from '../../../core/auth/auth.types';
-import { PrismaService } from '../../../core/database/prisma.service';
 import { ScryptSecretHasher } from '../../../core/security/scrypt-secret-hasher.service';
 import { ScryptSecretVerifier } from '../../../core/security/scrypt-secret-verifier.service';
-import type { ArticleData } from '../../../../mongoose/models/article.model';
-import { MongoArticleRepository } from '../data/mongo-article.repository';
+import {
+  ArticleAuthorRepository,
+  ArticleRepository,
+  type ArticleRecord,
+} from './article.repository';
 import type {
-  AdminArticleReviewDto,
-  ArticleQueryDto,
-  CreateArticleDto,
-  UpdateArticleDto,
-} from '../presentation/article.dto';
-import type {
+  ArticleQueryOptions,
+  ArticleReviewInput,
   ArticleDetailView,
   ArticleSummaryView,
+  CreateArticleInput,
   PendingArticleQueryOptions,
+  UpdateArticleInput,
 } from './article.types';
 
 @Injectable()
-export class ArticleService {
+export class ArticleUseCases {
   constructor(
-    private readonly repository: MongoArticleRepository,
-    private readonly prisma: PrismaService,
+    private readonly repository: ArticleRepository,
+    private readonly authors: ArticleAuthorRepository,
     private readonly hasher: ScryptSecretHasher,
     private readonly verifier: ScryptSecretVerifier,
   ) {}
 
   async createDraft(
     actor: AuthenticatedUser,
-    input: CreateArticleDto,
+    input: CreateArticleInput,
   ): Promise<ArticleSummaryView> {
-    const user = await this.prisma.user.findUnique({
-      where: { id: actor.userId },
-      select: { username: true, fullName: true },
-    });
+    const user = await this.authors.findById(actor.userId);
 
     if (!user) {
       throw new NotFoundException('User profile not found.');
@@ -51,12 +48,14 @@ export class ArticleService {
 
     if (input.accessPolicy === 'PURCHASE') {
       if (!input.pin) {
-        throw new BadRequestException('A PIN is required for PURCHASE articles.');
+        throw new BadRequestException(
+          'A PIN is required for PURCHASE articles.',
+        );
       }
       pinHash = await this.hasher.hash(input.pin);
     }
 
-    const data: ArticleData = {
+    const data: ArticleRecord = {
       contentId,
       title: input.title,
       description: input.description,
@@ -81,7 +80,7 @@ export class ArticleService {
   async updateDraft(
     actor: AuthenticatedUser,
     contentId: string,
-    input: UpdateArticleDto,
+    input: UpdateArticleInput,
   ): Promise<ArticleSummaryView> {
     const article = await this.repository.findByContentId(contentId);
     if (!article) {
@@ -89,7 +88,9 @@ export class ArticleService {
     }
 
     if (article.authorId !== actor.userId) {
-      throw new ForbiddenException('You are not authorized to edit this article.');
+      throw new ForbiddenException(
+        'You are not authorized to edit this article.',
+      );
     }
 
     if (article.status !== 'DRAFT' && article.status !== 'REJECTED') {
@@ -98,12 +99,14 @@ export class ArticleService {
       );
     }
 
-    const updates: Partial<ArticleData> = {};
+    const updates: Partial<ArticleRecord> = {};
     if (input.title !== undefined) updates.title = input.title;
-    if (input.description !== undefined) updates.description = input.description;
+    if (input.description !== undefined)
+      updates.description = input.description;
     if (input.content !== undefined) updates.content = input.content;
     if (input.tags !== undefined) updates.tags = input.tags;
-    if (input.coverImageUrl !== undefined) updates.coverImageUrl = input.coverImageUrl;
+    if (input.coverImageUrl !== undefined)
+      updates.coverImageUrl = input.coverImageUrl;
 
     if (input.accessPolicy !== undefined) {
       updates.accessPolicy = input.accessPolicy;
@@ -148,7 +151,9 @@ export class ArticleService {
     }
 
     if (article.authorId !== actor.userId) {
-      throw new ForbiddenException('You are not authorized to submit this article.');
+      throw new ForbiddenException(
+        'You are not authorized to submit this article.',
+      );
     }
 
     if (article.status !== 'DRAFT' && article.status !== 'REJECTED') {
@@ -174,7 +179,7 @@ export class ArticleService {
     return this.toSummary(updated);
   }
 
-  async getPublishedArticles(query: ArticleQueryDto): Promise<{
+  async getPublishedArticles(query: ArticleQueryOptions): Promise<{
     list: ArticleSummaryView[];
     page: number;
     limit: number;
@@ -266,11 +271,17 @@ export class ArticleService {
     }
 
     if (article.accessPolicy !== 'PURCHASE') {
-      return { success: true, message: 'This article is already free to read.' };
+      return {
+        success: true,
+        message: 'This article is already free to read.',
+      };
     }
 
     if (article.unlockedUserIds?.includes(actor.userId)) {
-      return { success: true, message: 'Article is already unlocked on your account.' };
+      return {
+        success: true,
+        message: 'Article is already unlocked on your account.',
+      };
     }
 
     if (!article.pinHash) {
@@ -364,7 +375,9 @@ export class ArticleService {
     };
   }
 
-  async getArticleForAdminReview(contentId: string): Promise<ArticleDetailView> {
+  async getArticleForAdminReview(
+    contentId: string,
+  ): Promise<ArticleDetailView> {
     const article = await this.repository.findByContentId(contentId);
     if (!article) {
       throw new NotFoundException('Article not found.');
@@ -381,7 +394,7 @@ export class ArticleService {
   async reviewArticle(
     adminUser: AuthenticatedUser,
     contentId: string,
-    input: AdminArticleReviewDto,
+    input: ArticleReviewInput,
   ): Promise<ArticleSummaryView> {
     const article = await this.repository.findByContentId(contentId);
     if (!article) {
@@ -394,7 +407,7 @@ export class ArticleService {
       );
     }
 
-    const updates: Partial<ArticleData> = {
+    const updates: Partial<ArticleRecord> = {
       reviewedByUserId: adminUser.userId,
       reviewedAt: new Date(),
       reviewNotes: input.reviewNotes,
@@ -417,7 +430,7 @@ export class ArticleService {
     return this.toSummary(updated);
   }
 
-  private toSummary(item: ArticleData): ArticleSummaryView {
+  private toSummary(item: ArticleRecord): ArticleSummaryView {
     return {
       contentId: item.contentId,
       title: item.title,

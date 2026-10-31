@@ -13,7 +13,7 @@ import type { AuthenticatedUser } from '../../../core/auth/auth.types';
 import { CurrentUser } from '../../../core/auth/decorators/current-user.decorator';
 import { OptionalAuth } from '../../../core/auth/decorators/optional-auth.decorator';
 import { ZodValidationPipe } from '../../../core/validator/zod-validation.pipe';
-import { ArticleService } from '../domain/article.service';
+import { ArticleUseCases } from '../domain/article.usecases';
 import {
   articleQuerySchema,
   createArticleSchema,
@@ -27,7 +27,7 @@ import {
 
 @Controller({ path: 'articles', version: '1' })
 export class ArticleController {
-  constructor(private readonly service: ArticleService) {}
+  constructor(private readonly useCases: ArticleUseCases) {}
 
   @Post()
   @HttpCode(HttpStatus.CREATED)
@@ -35,7 +35,7 @@ export class ArticleController {
     @CurrentUser() actor: AuthenticatedUser,
     @Body(new ZodValidationPipe(createArticleSchema)) input: CreateArticleDto,
   ) {
-    return this.service.createDraft(actor, input);
+    return this.useCases.createDraft(actor, input);
   }
 
   @Patch(':id')
@@ -44,7 +44,7 @@ export class ArticleController {
     @Param('id') id: string,
     @Body(new ZodValidationPipe(updateArticleSchema)) input: UpdateArticleDto,
   ) {
-    return this.service.updateDraft(actor, id, input);
+    return this.useCases.updateDraft(actor, id, input);
   }
 
   @Post(':id/submit-for-review')
@@ -53,7 +53,7 @@ export class ArticleController {
     @CurrentUser() actor: AuthenticatedUser,
     @Param('id') id: string,
   ) {
-    return this.service.submitForReview(actor, id);
+    return this.useCases.submitForReview(actor, id);
   }
 
   @Get('me')
@@ -63,8 +63,14 @@ export class ArticleController {
     @Query('limit') limit = '20',
   ) {
     const pageNum = Math.max(1, Number.parseInt(page, 10) || 1);
-    const limitNum = Math.min(100, Math.max(1, Number.parseInt(limit, 10) || 20));
-    return this.service.getMyArticles(actor, { page: pageNum, limit: limitNum });
+    const limitNum = Math.min(
+      100,
+      Math.max(1, Number.parseInt(limit, 10) || 20),
+    );
+    return this.useCases.getMyArticles(actor, {
+      page: pageNum,
+      limit: limitNum,
+    });
   }
 
   @OptionalAuth()
@@ -72,7 +78,7 @@ export class ArticleController {
   async getPublished(
     @Query(new ZodValidationPipe(articleQuerySchema)) query: ArticleQueryDto,
   ) {
-    return this.service.getPublishedArticles(query);
+    return this.useCases.getPublishedArticles(query);
   }
 
   @OptionalAuth()
@@ -81,7 +87,7 @@ export class ArticleController {
     @Param('id') id: string,
     @CurrentUser() actor?: AuthenticatedUser,
   ) {
-    return this.service.getArticleDetail(id, actor?.userId);
+    return this.useCases.getArticleDetail(id, actor?.userId);
   }
 
   @Post(':id/unlock')
@@ -91,6 +97,6 @@ export class ArticleController {
     @Param('id') id: string,
     @Body(new ZodValidationPipe(unlockArticleSchema)) input: UnlockArticleDto,
   ) {
-    return this.service.unlockArticle(actor, id, input.pin);
+    return this.useCases.unlockArticle(actor, id, input.pin);
   }
 }

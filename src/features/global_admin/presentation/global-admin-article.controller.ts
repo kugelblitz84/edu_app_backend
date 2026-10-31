@@ -11,7 +11,7 @@ import type { AuthenticatedUser } from '../../../core/auth/auth.types';
 import { CurrentUser } from '../../../core/auth/decorators/current-user.decorator';
 import { Roles } from '../../../core/auth/decorators/roles.decorator';
 import { ZodValidationPipe } from '../../../core/validator/zod-validation.pipe';
-import { ArticleService } from '../../articles/domain/article.service';
+import { ArticleUseCases } from '../../articles/domain/article.usecases';
 import {
   adminArticleQuerySchema,
   adminArticleReviewSchema,
@@ -24,14 +24,14 @@ import {
 @Controller({ path: 'global-admin/articles', version: '1' })
 @Roles('GLOBAL_ADMIN')
 export class GlobalAdminArticleController {
-  constructor(private readonly articleService: ArticleService) {}
+  constructor(private readonly useCases: ArticleUseCases) {}
 
   @Get('pending')
   async getPending(
     @Query(new ZodValidationPipe(adminArticleQuerySchema))
     query: AdminArticleQueryDto,
   ) {
-    return this.articleService.getPendingArticles(query);
+    return this.useCases.getPendingArticles(query);
   }
 
   @Get('responded-by-me')
@@ -40,12 +40,12 @@ export class GlobalAdminArticleController {
     query: AdminRespondedQueryDto,
     @CurrentUser() currentUser: AuthenticatedUser,
   ) {
-    return this.articleService.getRespondedByMe(currentUser.userId, query);
+    return this.useCases.getRespondedByMe(currentUser.userId, query);
   }
 
   @Get(':id')
   async getDetail(@Param('id', new ParseUUIDPipe()) id: string) {
-    return this.articleService.getArticleForAdminReview(id);
+    return this.useCases.getArticleForAdminReview(id);
   }
 
   @Patch(':id/respond')
@@ -55,6 +55,6 @@ export class GlobalAdminArticleController {
     body: AdminArticleReviewDto,
     @CurrentUser() currentUser: AuthenticatedUser,
   ) {
-    return this.articleService.reviewArticle(currentUser, id, body);
+    return this.useCases.reviewArticle(currentUser, id, body);
   }
 }

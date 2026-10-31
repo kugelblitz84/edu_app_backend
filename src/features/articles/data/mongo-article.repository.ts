@@ -1,45 +1,47 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
 import type { Model } from 'mongoose';
 import {
   articleSchema,
-  type ArticleData,
   type ArticleDocument,
 } from '../../../../mongoose/models/article.model';
 import { MongooseService } from '../../../core/database/mongoose.service';
+import {
+  ArticleRepository,
+  type ArticleRecord,
+} from '../domain/article.repository';
 import type {
   ArticleQueryOptions,
   PendingArticleQueryOptions,
 } from '../domain/article.types';
 
 @Injectable()
-export class MongoArticleRepository {
-  private readonly logger = new Logger(MongoArticleRepository.name);
-
-  constructor(private readonly mongoose: MongooseService) {}
+export class MongoArticleRepository extends ArticleRepository {
+  constructor(private readonly mongoose: MongooseService) {
+    super();
+  }
 
   private get model(): Model<ArticleDocument> {
     return (
       (this.mongoose.connection.models.Article as
-        | Model<ArticleDocument>
-        | undefined) ??
+        Model<ArticleDocument> | undefined) ??
       this.mongoose.connection.model<ArticleDocument>('Article', articleSchema)
     );
   }
 
-  async create(data: ArticleData): Promise<ArticleData> {
+  async create(data: ArticleRecord): Promise<ArticleRecord> {
     const doc = await this.model.create(data);
     return doc.toObject();
   }
 
-  async findByContentId(contentId: string): Promise<ArticleData | null> {
+  async findByContentId(contentId: string): Promise<ArticleRecord | null> {
     const doc = await this.model.findOne({ contentId }).exec();
     return doc ? doc.toObject() : null;
   }
 
   async updateByContentId(
     contentId: string,
-    updates: Partial<ArticleData>,
-  ): Promise<ArticleData | null> {
+    updates: Partial<ArticleRecord>,
+  ): Promise<ArticleRecord | null> {
     const doc = await this.model
       .findOneAndUpdate({ contentId }, { $set: updates }, { new: true })
       .exec();
@@ -47,7 +49,7 @@ export class MongoArticleRepository {
   }
 
   async findPublished(options: ArticleQueryOptions): Promise<{
-    list: ArticleData[];
+    list: ArticleRecord[];
     total: number;
   }> {
     const filter: Record<string, unknown> = { status: 'PUBLISHED' };
@@ -62,10 +64,7 @@ export class MongoArticleRepository {
 
     if (options.search) {
       const searchRegex = new RegExp(options.search, 'i');
-      filter.$or = [
-        { title: searchRegex },
-        { description: searchRegex },
-      ];
+      filter.$or = [{ title: searchRegex }, { description: searchRegex }];
     }
 
     const skip = (options.page - 1) * options.limit;
@@ -80,13 +79,13 @@ export class MongoArticleRepository {
       this.model.countDocuments(filter).exec(),
     ]);
 
-    return { list: list as ArticleData[], total };
+    return { list: list as ArticleRecord[], total };
   }
 
   async findByAuthor(
     authorId: string,
     options: { page: number; limit: number },
-  ): Promise<{ list: ArticleData[]; total: number }> {
+  ): Promise<{ list: ArticleRecord[]; total: number }> {
     const filter = { authorId };
     const skip = (options.page - 1) * options.limit;
     const [list, total] = await Promise.all([
@@ -100,11 +99,11 @@ export class MongoArticleRepository {
       this.model.countDocuments(filter).exec(),
     ]);
 
-    return { list: list as ArticleData[], total };
+    return { list: list as ArticleRecord[], total };
   }
 
   async findPending(options: PendingArticleQueryOptions): Promise<{
-    list: ArticleData[];
+    list: ArticleRecord[];
     total: number;
   }> {
     const filter: Record<string, unknown> = { status: 'PENDING_REVIEW' };
@@ -115,10 +114,7 @@ export class MongoArticleRepository {
 
     if (options.search) {
       const searchRegex = new RegExp(options.search, 'i');
-      filter.$or = [
-        { title: searchRegex },
-        { authorUsername: searchRegex },
-      ];
+      filter.$or = [{ title: searchRegex }, { authorUsername: searchRegex }];
     }
 
     const skip = (options.page - 1) * options.limit;
@@ -133,13 +129,13 @@ export class MongoArticleRepository {
       this.model.countDocuments(filter).exec(),
     ]);
 
-    return { list: list as ArticleData[], total };
+    return { list: list as ArticleRecord[], total };
   }
 
   async findRespondedBy(
     reviewerId: string,
     options: { page: number; limit: number },
-  ): Promise<{ list: ArticleData[]; total: number }> {
+  ): Promise<{ list: ArticleRecord[]; total: number }> {
     const filter = { reviewedByUserId: reviewerId };
     const skip = (options.page - 1) * options.limit;
     const [list, total] = await Promise.all([
@@ -153,15 +149,12 @@ export class MongoArticleRepository {
       this.model.countDocuments(filter).exec(),
     ]);
 
-    return { list: list as ArticleData[], total };
+    return { list: list as ArticleRecord[], total };
   }
 
   async addUnlockUser(contentId: string, userId: string): Promise<boolean> {
     const result = await this.model
-      .updateOne(
-        { contentId },
-        { $addToSet: { unlockedUserIds: userId } },
-      )
+      .updateOne({ contentId }, { $addToSet: { unlockedUserIds: userId } })
       .exec();
     return result.modifiedCount > 0;
   }

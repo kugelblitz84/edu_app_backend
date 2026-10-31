@@ -1,41 +1,17 @@
 import mongoose, { type Document, type Model } from 'mongoose';
+import type { ArticleRecord } from '../../src/features/articles/domain/article.repository';
+// import type {
+//   ArticleAccessPolicy,
+//   ArticleStatus,
+// } from '../../src/features/articles/domain/article.types';
 
-export type ArticleAccessPolicy = 'FREE' | 'PURCHASE';
-export type ArticleStatus =
-  | 'DRAFT'
-  | 'PENDING_REVIEW'
-  | 'PUBLISHED'
-  | 'REJECTED'
-  | 'ARCHIVED';
+export type {
+  ArticleAccessPolicy,
+  ArticleStatus,
+} from '../../src/features/articles/domain/article.types';
+export type ArticleDocument = ArticleRecord & Document;
 
-export interface ArticleData {
-  contentId: string;
-  title: string;
-  description?: string;
-  content: string;
-  accessPolicy: ArticleAccessPolicy;
-  priceAmountMinor?: number;
-  currency?: string;
-  pinHash?: string;
-  status: ArticleStatus;
-  tags?: string[];
-  coverImageUrl?: string;
-  authorId: string;
-  authorUsername: string;
-  authorFullName?: string;
-  unlockedUserIds?: string[];
-  rejectReason?: string;
-  reviewNotes?: string;
-  reviewedByUserId?: string;
-  reviewedAt?: Date;
-  publishedAt?: Date;
-  createdAt?: Date;
-  updatedAt?: Date;
-}
-
-export type ArticleDocument = ArticleData & Document;
-
-export const articleSchema = new mongoose.Schema<ArticleData>(
+export const articleSchema = new mongoose.Schema<ArticleRecord>(
   {
     contentId: { type: String, required: true, unique: true, index: true },
     title: { type: String, required: true, trim: true },

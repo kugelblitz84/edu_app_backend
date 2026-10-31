@@ -1,4 +1,6 @@
-import type { ArticleAccessPolicy, ArticleStatus } from '../../../../mongoose/models/article.model';
+export type ArticleAccessPolicy = 'FREE' | 'PURCHASE';
+export type ArticleStatus =
+  'DRAFT' | 'PENDING_REVIEW' | 'PUBLISHED' | 'REJECTED' | 'ARCHIVED';
 
 export interface CreateArticleInput {
   title: string;

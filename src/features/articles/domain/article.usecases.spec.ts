@@ -1,18 +1,26 @@
-import { BadRequestException, ConflictException, ForbiddenException, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  ConflictException,
+  ForbiddenException,
+  NotFoundException,
+} from '@nestjs/common';
 import type { AuthenticatedUser } from '../../../core/auth/auth.types';
-import type { ArticleData } from '../../../../mongoose/models/article.model';
-import { ArticleService } from './article.service';
+import { ArticleUseCases } from './article.usecases';
+import type {
+  ArticleRepository,
+  ArticleAuthorRepository,
+  ArticleRecord,
+} from './article.repository';
 import type { MongoArticleRepository } from '../data/mongo-article.repository';
 import type { ScryptSecretHasher } from '../../../core/security/scrypt-secret-hasher.service';
 import type { ScryptSecretVerifier } from '../../../core/security/scrypt-secret-verifier.service';
-import type { PrismaService } from '../../../core/database/prisma.service';
 
-describe('ArticleService', () => {
-  let service: ArticleService;
+describe('ArticleUseCases', () => {
+  let service: ArticleUseCases;
   let repository: jest.Mocked<Partial<MongoArticleRepository>>;
   let hasher: jest.Mocked<Partial<ScryptSecretHasher>>;
   let verifier: jest.Mocked<Partial<ScryptSecretVerifier>>;
-  let prisma: jest.Mocked<Partial<PrismaService>>;
+  let authors: jest.Mocked<Partial<ArticleAuthorRepository>>;
 
   const author: AuthenticatedUser = {
     userId: '11111111-1111-1111-1111-111111111111',
@@ -32,11 +40,12 @@ describe('ArticleService', () => {
     sessionId: 'session-2',
   };
 
-  const mockArticle: ArticleData = {
+  const mockArticle: ArticleRecord = {
     contentId: 'art-1234-uuid',
     title: 'Mastering System Design',
     description: 'A deep dive into distributed systems',
-    content: 'Full content of the article detailing microservices, caching, and partitioning.',
+    content:
+      'Full content of the article detailing microservices, caching, and partitioning.',
     accessPolicy: 'PURCHASE',
     priceAmountMinor: 499,
     currency: 'USD',
@@ -73,19 +82,16 @@ describe('ArticleService', () => {
       verify: jest.fn(),
     };
 
-    prisma = {
-      user: {
-        findUnique: jest.fn().mockResolvedValue({
-          id: author.userId,
-          username: 'author_dev',
-          userProfile: { fullName: 'Author Dev' },
-        }),
-      } as any,
+    authors = {
+      findById: jest.fn().mockResolvedValue({
+        username: 'author_dev',
+        fullName: 'Author Dev',
+      }),
     };
 
-    service = new ArticleService(
-      repository as MongoArticleRepository,
-      prisma as PrismaService,
+    service = new ArticleUseCases(
+      repository as unknown as ArticleRepository,
+      authors as ArticleAuthorRepository,
       hasher as ScryptSecretHasher,
       verifier as ScryptSecretVerifier,
     );
@@ -127,7 +133,10 @@ describe('ArticleService', () => {
     it('returns preview snippet and locked state for un-unlocked reader on paid article', async () => {
       (repository.findByContentId as jest.Mock).mockResolvedValue(mockArticle);
 
-      const result = await service.getArticleDetail(mockArticle.contentId, reader.userId);
+      const result = await service.getArticleDetail(
+        mockArticle.contentId,
+        reader.userId,
+      );
 
       expect(result.access.canAccess).toBe(false);
       expect(result.access.reason).toBe('PIN_REQUIRED');
@@ -138,7 +147,10 @@ describe('ArticleService', () => {
     it('returns full content for the article author even if paid', async () => {
       (repository.findByContentId as jest.Mock).mockResolvedValue(mockArticle);
 
-      const result = await service.getArticleDetail(mockArticle.contentId, author.userId);
+      const result = await service.getArticleDetail(
+        mockArticle.contentId,
+        author.userId,
+      );
 
       expect(result.access.canAccess).toBe(true);
       expect(result.content).toBe(mockArticle.content);
@@ -150,7 +162,10 @@ describe('ArticleService', () => {
         unlockedUserIds: [reader.userId],
       });
 
-      const result = await service.getArticleDetail(mockArticle.contentId, reader.userId);
+      const result = await service.getArticleDetail(
+        mockArticle.contentId,
+        reader.userId,
+      );
 
       expect(result.access.canAccess).toBe(true);
       expect(result.content).toBe(mockArticle.content);
@@ -162,7 +177,10 @@ describe('ArticleService', () => {
         accessPolicy: 'FREE',
       });
 
-      const result = await service.getArticleDetail(mockArticle.contentId, undefined);
+      const result = await service.getArticleDetail(
+        mockArticle.contentId,
+        undefined,
+      );
 
       expect(result.access.canAccess).toBe(true);
       expect(result.access.reason).toBe('FREE');
@@ -176,11 +194,21 @@ describe('ArticleService', () => {
       (verifier.verify as jest.Mock).mockResolvedValue(true);
       (repository.addUnlockUser as jest.Mock).mockResolvedValue(true);
 
-      const result = await service.unlockArticle(reader, mockArticle.contentId, '123456');
+      const result = await service.unlockArticle(
+        reader,
+        mockArticle.contentId,
+        '123456',
+      );
 
       expect(result.success).toBe(true);
-      expect(verifier.verify).toHaveBeenCalledWith('123456', mockArticle.pinHash);
-      expect(repository.addUnlockUser).toHaveBeenCalledWith(mockArticle.contentId, reader.userId);
+      expect(verifier.verify).toHaveBeenCalledWith(
+        '123456',
+        mockArticle.pinHash,
+      );
+      expect(repository.addUnlockUser).toHaveBeenCalledWith(
+        mockArticle.contentId,
+        reader.userId,
+      );
     });
 
     it('rejects incorrect PIN with ForbiddenException', async () => {
@@ -195,19 +223,26 @@ describe('ArticleService', () => {
 
   describe('reviewArticle (Super Admin)', () => {
     it('approves a pending article and marks it published', async () => {
-      const pendingArticle: ArticleData = {
+      const pendingArticle: ArticleRecord = {
         ...mockArticle,
         status: 'PENDING_REVIEW',
       };
-      (repository.findByContentId as jest.Mock).mockResolvedValue(pendingArticle);
+      (repository.findByContentId as jest.Mock).mockResolvedValue(
+        pendingArticle,
+      );
       (repository.updateByContentId as jest.Mock).mockImplementation(
-        async (_id, updates) => ({ ...pendingArticle, ...updates } as ArticleData),
+        async (_id, updates) =>
+          ({ ...pendingArticle, ...updates }) as ArticleRecord,
       );
 
-      const result = await service.reviewArticle(admin, pendingArticle.contentId, {
-        status: 'APPROVED',
-        reviewNotes: 'Looks solid and accurate.',
-      });
+      const result = await service.reviewArticle(
+        admin,
+        pendingArticle.contentId,
+        {
+          status: 'APPROVED',
+          reviewNotes: 'Looks solid and accurate.',
+        },
+      );
 
       expect(result.status).toBe('PUBLISHED');
       expect(repository.updateByContentId).toHaveBeenCalledWith(
@@ -220,19 +255,26 @@ describe('ArticleService', () => {
     });
 
     it('rejects a pending article with required rejection reason', async () => {
-      const pendingArticle: ArticleData = {
+      const pendingArticle: ArticleRecord = {
         ...mockArticle,
         status: 'PENDING_REVIEW',
       };
-      (repository.findByContentId as jest.Mock).mockResolvedValue(pendingArticle);
+      (repository.findByContentId as jest.Mock).mockResolvedValue(
+        pendingArticle,
+      );
       (repository.updateByContentId as jest.Mock).mockImplementation(
-        async (_id, updates) => ({ ...pendingArticle, ...updates } as ArticleData),
+        async (_id, updates) =>
+          ({ ...pendingArticle, ...updates }) as ArticleRecord,
       );
 
-      const result = await service.reviewArticle(admin, pendingArticle.contentId, {
-        status: 'REJECTED',
-        rejectReason: 'Needs references for citations.',
-      });
+      const result = await service.reviewArticle(
+        admin,
+        pendingArticle.contentId,
+        {
+          status: 'REJECTED',
+          rejectReason: 'Needs references for citations.',
+        },
+      );
 
       expect(result.status).toBe('REJECTED');
       expect(repository.updateByContentId).toHaveBeenCalledWith(
