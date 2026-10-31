@@ -8,7 +8,7 @@ import { MongooseService } from '../../../core/database/mongoose.service';
 import {
   ArticleRepository,
   type ArticleRecord,
-} from '../domain/article.repository';
+} from '../domain/article.repository-contract';
 import type {
   ArticleQueryOptions,
   PendingArticleQueryOptions,

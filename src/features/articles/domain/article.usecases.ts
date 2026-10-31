@@ -13,7 +13,7 @@ import {
   ArticleAuthorRepository,
   ArticleRepository,
   type ArticleRecord,
-} from './article.repository';
+} from './article.repository-contract';
 import type {
   ArticleQueryOptions,
   ArticleReviewInput,

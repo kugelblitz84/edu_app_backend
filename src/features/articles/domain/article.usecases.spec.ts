@@ -10,7 +10,7 @@ import type {
   ArticleRepository,
   ArticleAuthorRepository,
   ArticleRecord,
-} from './article.repository';
+} from './article.repository-contract';
 import type { MongoArticleRepository } from '../data/mongo-article.repository';
 import type { ScryptSecretHasher } from '../../../core/security/scrypt-secret-hasher.service';
 import type { ScryptSecretVerifier } from '../../../core/security/scrypt-secret-verifier.service';

@@ -8,7 +8,7 @@ import { PrismaArticleAuthorRepository } from './data/prisma-article-author.repo
 import {
   ArticleRepository,
   ArticleAuthorRepository,
-} from './domain/article.repository';
+} from './domain/article.repository-contract';
 import { ArticleUseCases } from './domain/article.usecases';
 import { ArticleController } from './presentation/article.controller';
 

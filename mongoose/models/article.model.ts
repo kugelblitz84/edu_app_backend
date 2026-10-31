@@ -1,5 +1,5 @@
 import mongoose, { type Document, type Model } from 'mongoose';
-import type { ArticleRecord } from '../../src/features/articles/domain/article.repository';
+import type { ArticleRecord } from '../../src/features/articles/domain/article.repository-contract';
 // import type {
 //   ArticleAccessPolicy,
 //   ArticleStatus,

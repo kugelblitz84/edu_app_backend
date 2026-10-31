@@ -3,7 +3,7 @@ import { PrismaService } from '../../../core/database/prisma.service';
 import {
   ArticleAuthorRepository,
   type ArticleAuthor,
-} from '../domain/article.repository';
+} from '../domain/article.repository-contract';
 
 @Injectable()
 export class PrismaArticleAuthorRepository extends ArticleAuthorRepository {
