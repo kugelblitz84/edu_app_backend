@@ -87,7 +87,13 @@ export class ResourceController {
     @Body(new ZodValidationPipe(updateResourceSchema))
     input: UpdateMaterialInput,
   ) {
-    return this.service.update('RESOURCE', id, actor.userId, input);
+    return this.service.update(
+      'RESOURCE',
+      id,
+      actor.userId,
+      input,
+      actor.platformRole === 'GLOBAL_ADMIN',
+    );
   }
 
   // Create a purpose-bound content or thumbnail upload intent.

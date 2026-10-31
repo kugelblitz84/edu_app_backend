@@ -10,6 +10,7 @@ export interface Material {
   kind: Kind;
   type?: 'PDF' | 'VIDEO' | 'ARTICLE';
   isStandalone?: boolean;
+  isFeatured: boolean;
   title: string;
   description: string | null;
   ownerUserId: string;
@@ -91,5 +92,6 @@ export interface CatalogQuery {
   institutionId?: string;
   accessPolicy?: Policy;
   status?: Status;
+  isFeatured?: boolean;
   sort: 'newest' | 'oldest' | 'title';
 }

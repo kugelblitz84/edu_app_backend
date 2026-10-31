@@ -70,7 +70,10 @@ export const createResourceSchema = createCollectionSchema
 export const updateCollectionSchema = z
   .object(fields)
   .partial()
-  .extend({ version: z.number().int().positive() })
+  .extend({
+    version: z.number().int().positive(),
+    isFeatured: z.boolean().optional(),
+  })
   .strict();
 export const updateResourceSchema = updateCollectionSchema
   .extend({ isStandalone: z.boolean().optional() })
@@ -118,6 +121,10 @@ export const publicQuerySchema = z
     type: z.enum(['PDF', 'VIDEO']).optional(),
     institutionId: z.uuid().optional(),
     accessPolicy: policySchema.optional(),
+    isFeatured: z
+      .enum(['true', 'false'])
+      .transform((value) => value === 'true')
+      .optional(),
     sort: z.enum(['newest', 'oldest', 'title']).default('newest'),
   })
   .strict();

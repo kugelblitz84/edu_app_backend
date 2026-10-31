@@ -30,6 +30,7 @@ export function metadata(item: Material) {
     institution: item.institutionId ? { id: item.institutionId } : null,
     accessPolicy: item.accessPolicy,
     status: item.status,
+    isFeatured: item.isFeatured,
     priceAmountMinor: item.priceAmountMinor,
     currency: item.currency,
     hasPin: !!item.pinHash,

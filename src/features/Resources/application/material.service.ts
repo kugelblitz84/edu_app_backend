@@ -152,6 +152,7 @@ export class MaterialService {
       institutionId: input.institutionId ?? null,
       accessPolicy: input.accessPolicy,
       status: 'DRAFT',
+      isFeatured: false,
       priceAmountMinor: input.priceAmountMinor ?? null,
       currency: input.currency ?? null,
       pinHash,
@@ -214,11 +215,27 @@ export class MaterialService {
     id: string,
     actor: string,
     input: UpdateMaterialInput,
+    isGlobalAdmin = false,
   ) {
     const pinHash = input.pin ? await this.hasher.hash(input.pin) : undefined;
     return this.repository.transaction(async (store) => {
-      const item = await this.manager(store, kind, id, actor);
+      if (input.isFeatured !== undefined && !isGlobalAdmin)
+        throw new ForbiddenException(
+          'Global administrator required to feature material.',
+        );
+      const featuredOnly =
+        input.isFeatured !== undefined &&
+        Object.keys(input).every(
+          (key) => key === 'version' || key === 'isFeatured',
+        );
+      const item =
+        featuredOnly && isGlobalAdmin
+          ? await this.require(store, kind, id)
+          : await this.manager(store, kind, id, actor);
+      if (item.status === 'DELETED')
+        throw new NotFoundException('Managed material not found.');
       this.version(item, input.version);
+      if (input.isFeatured !== undefined) item.isFeatured = input.isFeatured;
       const previousPolicy = item.accessPolicy;
       if (input.title !== undefined) item.title = input.title;
       if (input.description !== undefined) item.description = input.description;

@@ -85,7 +85,13 @@ export class ResourceCollectionController {
     @Body(new ZodValidationPipe(updateCollectionSchema))
     input: UpdateMaterialInput,
   ) {
-    return this.service.update('COLLECTION', id, actor.userId, input);
+    return this.service.update(
+      'COLLECTION',
+      id,
+      actor.userId,
+      input,
+      actor.platformRole === 'GLOBAL_ADMIN',
+    );
   }
 
   // Create a signed upload intent for an uploaded collection cover.

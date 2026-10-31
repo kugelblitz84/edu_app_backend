@@ -66,6 +66,7 @@ class PrismaMaterialStore extends MaterialStore {
       institutionId: item.institutionId,
       accessPolicy: item.accessPolicy,
       status: item.status,
+      isFeatured: item.isFeatured,
       priceAmountMinor: item.priceAmountMinor,
       currency: item.currency,
       pinHash: item.pinHash,
@@ -98,7 +99,11 @@ class PrismaMaterialStore extends MaterialStore {
     if (item.kind === 'RESOURCE')
       await this.db.resource.update({
         where: { id: item.id },
-        data: { ...this.data(item), isStandalone: item.isStandalone },
+        data: {
+          ...this.data(item),
+          isStandalone: item.isStandalone,
+          isFeatured: item.isFeatured,
+        },
       });
     else
       await this.db.resourceCollection.update({
@@ -291,6 +296,8 @@ class PrismaMaterialStore extends MaterialStore {
         );
       if (query.type && kind === 'RESOURCE')
         conditions.push(Prisma.sql`m.type::text = ${query.type}`);
+      if (query.isFeatured !== undefined)
+        conditions.push(Prisma.sql`m.is_featured = ${query.isFeatured}`);
       queries.push(
         Prisma.sql`SELECT m.id, ${kind}::text AS kind, m.created_at, m.title FROM ${table} m WHERE ${Prisma.join(conditions, ' AND ')}`,
       );
