@@ -13,6 +13,9 @@ export const pinSchema = z
 export const versionSchema = z
   .object({ version: z.number().int().positive() })
   .strict();
+export const featuredStatusSchema = versionSchema
+  .extend({ isFeatured: z.boolean() })
+  .strict();
 const currencyCodes = new Set(
   'AED AFN ALL AMD ANG AOA ARS AUD AWG AZN BAM BBD BDT BGN BHD BIF BMD BND BOB BOV BRL BSD BTN BWP BYN BZD CAD CDF CHE CHF CHW CLF CLP CNY COP COU CRC CUC CUP CVE CZK DJF DKK DOP DZD EGP ERN ETB EUR FJD FKP GBP GEL GHS GIP GMD GNF GTQ GYD HKD HNL HRK HTG HUF IDR ILS INR IQD IRR ISK JMD JOD JPY KES KGS KHR KMF KPW KRW KWD KYD KZT LAK LBP LKR LRD LSL LYD MAD MDL MGA MKD MMK MNT MOP MRU MUR MVR MWK MXN MXV MYR MZN NAD NGN NIO NOK NPR NZD OMR PAB PEN PGK PHP PKR PLN PYG QAR RON RSD RUB RWF SAR SBD SCR SDG SEK SGD SHP SLE SLL SOS SRD SSP STN SVC SYP SZL THB TJS TMT TND TOP TRY TTD TWD TZS UAH UGX USD USN UYI UYU UYW UZS VED VES VND VUV WST XAF XCD XDR XOF XPF YER ZAR ZMW ZWG'.split(
     ' ',
@@ -148,6 +151,7 @@ export type UpdateMaterialInput = z.infer<typeof updateResourceSchema>;
 export type UploadRequest = z.infer<typeof uploadSchema>;
 export type CoverUploadRequest = z.infer<typeof coverUploadSchema>;
 export type VersionInput = z.infer<typeof versionSchema>;
+export type FeaturedStatusInput = z.infer<typeof featuredStatusSchema>;
 export type PinInput = z.infer<typeof unlockSchema>;
 export type RotatePinInput = z.infer<typeof rotatePinSchema>;
 export type AddItemInput = z.infer<typeof addItemSchema>;

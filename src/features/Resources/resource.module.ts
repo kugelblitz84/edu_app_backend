@@ -32,5 +32,6 @@ import { ResourceController } from './presentation/resource.controller';
     { provide: MaterialRepository, useClass: PrismaMaterialRepository },
     { provide: MATERIAL_CONFIG, useFactory: loadMaterialConfig },
   ],
+  exports: [MaterialService],
 })
 export class ResourceModule {}

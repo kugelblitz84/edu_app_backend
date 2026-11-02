@@ -270,7 +270,7 @@ Public query parameters: `page` (default 1), `limit` (default 20, max 100), `sea
 
 Use the existing catalogs to hydrate featured content: `GET /resources?isFeatured=true` returns featured standalone videos and books (PDF resources), and `GET /resource-collections?isFeatured=true` returns featured collections. Both routes retain their normal published/public visibility rules and pagination. `GET /institutions/:institutionId/resources?isFeatured=true` filters the combined institution feed.
 
-Only a `GLOBAL_ADMIN` can change featured status. Send `PATCH /resources/:id` or `PATCH /resource-collections/:id` with the current `version` and `isFeatured`; for example `{ "version": 3, "isFeatured": true }`. The response is the updated `MaterialDto` with an incremented version. Feature status is independent of publish status; only published records appear in public catalogs.
+Only a `GLOBAL_ADMIN` can change featured status. Send `PATCH /global-admin/resources/:id/featured` or `PATCH /global-admin/resource-collections/:id/featured` with the current `version` and `isFeatured`; for example `{ "version": 3, "isFeatured": true }`. These routes use the global-admin role guard. The response is the updated `MaterialDto` with an incremented version. Feature status is independent of publish status; only published records appear in public catalogs.
 
 ## Access and error handling
 
