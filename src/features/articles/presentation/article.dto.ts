@@ -1,10 +1,140 @@
 import { z } from 'zod';
 
+export const articleFontFamilySchema = z
+  .enum([
+    'Inter',
+    'Roboto',
+    'Merriweather',
+    'Playfair Display',
+    'Fira Code',
+    'System',
+  ])
+  .or(z.string().trim().min(1).max(50));
+
+export const articleTextAlignmentSchema = z.enum([
+  'left',
+  'center',
+  'right',
+  'justify',
+]);
+
+export const sectionLayoutTypeSchema = z.enum([
+  'SINGLE_COLUMN',
+  'TWO_COLUMN_EQUAL',
+  'TWO_COLUMN_WIDE_LEFT',
+  'MEDIA_TEXT_SPLIT',
+]);
+
+export const blockTypeSchema = z.enum([
+  'HEADING',
+  'PARAGRAPH',
+  'IMAGE',
+  'QUOTE',
+  'DIVIDER',
+]);
+
+export const imagePlacementSchema = z.enum([
+  'CONTAINED',
+  'FULL_BLEED',
+  'FLOAT_LEFT',
+  'FLOAT_RIGHT',
+]);
+
+export const sectionStyleSchema = z
+  .object({
+    fontFamily: articleFontFamilySchema.optional(),
+    backgroundColor: z.string().trim().max(30).optional(),
+    textColor: z.string().trim().max(30).optional(),
+    paddingY: z.enum(['compact', 'normal', 'spacious']).optional(),
+  })
+  .strict();
+
+export const headingBlockSchema = z
+  .object({
+    id: z.string().trim().min(1).max(64),
+    type: z.literal('HEADING'),
+    level: z.union([z.literal(1), z.literal(2), z.literal(3), z.literal(4)]),
+    text: z.string().max(10000),
+    align: articleTextAlignmentSchema.optional(),
+    fontFamily: articleFontFamilySchema.optional(),
+  })
+  .strict();
+
+export const paragraphBlockSchema = z
+  .object({
+    id: z.string().trim().min(1).max(64),
+    type: z.literal('PARAGRAPH'),
+    html: z.string().max(50000),
+    align: articleTextAlignmentSchema.optional(),
+    fontSize: z.enum(['sm', 'base', 'lg']).optional(),
+    fontFamily: articleFontFamilySchema.optional(),
+  })
+  .strict();
+
+export const imageBlockSchema = z
+  .object({
+    id: z.string().trim().min(1).max(64),
+    type: z.literal('IMAGE'),
+    url: z.string().url().max(2048),
+    altText: z.string().max(200).optional(),
+    caption: z.string().max(500).optional(),
+    placement: imagePlacementSchema.optional(),
+    aspectRatio: z.enum(['16:9', '4:3', '1:1', 'auto']).optional(),
+    widthPercentage: z.number().min(10).max(100).optional(),
+  })
+  .strict();
+
+export const quoteBlockSchema = z
+  .object({
+    id: z.string().trim().min(1).max(64),
+    type: z.literal('QUOTE'),
+    text: z.string().max(10000),
+    author: z.string().max(100).optional(),
+    style: z.enum(['modern', 'classic', 'highlight']).optional(),
+  })
+  .strict();
+
+export const dividerBlockSchema = z
+  .object({
+    id: z.string().trim().min(1).max(64),
+    type: z.literal('DIVIDER'),
+  })
+  .strict();
+
+export const articleBlockSchema = z.discriminatedUnion('type', [
+  headingBlockSchema,
+  paragraphBlockSchema,
+  imageBlockSchema,
+  quoteBlockSchema,
+  dividerBlockSchema,
+]);
+
+export const articleSectionSchema = z
+  .object({
+    id: z.string().trim().min(1).max(64),
+    layout: sectionLayoutTypeSchema.default('SINGLE_COLUMN'),
+    style: sectionStyleSchema.optional(),
+    blocks: z.array(articleBlockSchema).optional(),
+    columnLeft: z.array(articleBlockSchema).optional(),
+    columnRight: z.array(articleBlockSchema).optional(),
+  })
+  .strict();
+
+export const articleThemeSchema = z
+  .object({
+    baseFont: articleFontFamilySchema.default('Inter'),
+    headingFont: articleFontFamilySchema.default('Playfair Display'),
+    containerWidth: z.enum(['normal', 'wide', 'narrow']).default('normal'),
+  })
+  .strict();
+
 export const createArticleSchema = z
   .object({
     title: z.string().trim().min(1).max(200),
     description: z.string().trim().max(1000).optional(),
-    content: z.string().trim().min(10),
+    content: z.string().trim().min(1).optional(),
+    theme: articleThemeSchema.optional(),
+    sections: z.array(articleSectionSchema).optional(),
     accessPolicy: z.enum(['FREE', 'PURCHASE']).default('FREE'),
     priceAmountMinor: z.number().int().min(1).optional(),
     currency: z.string().trim().length(3).default('USD').optional(),
@@ -14,6 +144,13 @@ export const createArticleSchema = z
   })
   .strict()
   .superRefine((val, ctx) => {
+    if (!val.content && (!val.sections || val.sections.length === 0)) {
+      ctx.addIssue({
+        code: 'custom',
+        path: ['sections'],
+        message: 'Either content or at least one section must be provided.',
+      });
+    }
     if (val.accessPolicy === 'PURCHASE' && !val.pin) {
       ctx.addIssue({
         code: 'custom',
@@ -36,7 +173,9 @@ export const updateArticleSchema = z
   .object({
     title: z.string().trim().min(1).max(200).optional(),
     description: z.string().trim().max(1000).optional(),
-    content: z.string().trim().min(10).optional(),
+    content: z.string().trim().min(1).optional(),
+    theme: articleThemeSchema.optional(),
+    sections: z.array(articleSectionSchema).optional(),
     accessPolicy: z.enum(['FREE', 'PURCHASE']).optional(),
     priceAmountMinor: z.number().int().min(1).optional(),
     currency: z.string().trim().length(3).optional(),
@@ -113,4 +252,3 @@ export const adminRespondedQuerySchema = z
   .strict();
 
 export type AdminRespondedQueryDto = z.infer<typeof adminRespondedQuerySchema>;
-

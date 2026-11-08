@@ -5,6 +5,7 @@ import {
   HttpCode,
   HttpStatus,
   Param,
+  ParseUUIDPipe,
   Patch,
   Post,
   Query,
@@ -41,7 +42,7 @@ export class ArticleController {
   @Patch(':id')
   async update(
     @CurrentUser() actor: AuthenticatedUser,
-    @Param('id') id: string,
+    @Param('id', new ParseUUIDPipe()) id: string,
     @Body(new ZodValidationPipe(updateArticleSchema)) input: UpdateArticleDto,
   ) {
     return this.useCases.updateDraft(actor, id, input);
@@ -51,7 +52,7 @@ export class ArticleController {
   @HttpCode(HttpStatus.OK)
   async submitForReview(
     @CurrentUser() actor: AuthenticatedUser,
-    @Param('id') id: string,
+    @Param('id', new ParseUUIDPipe()) id: string,
   ) {
     return this.useCases.submitForReview(actor, id);
   }
@@ -84,7 +85,7 @@ export class ArticleController {
   @OptionalAuth()
   @Get(':id')
   async getDetail(
-    @Param('id') id: string,
+    @Param('id', new ParseUUIDPipe()) id: string,
     @CurrentUser() actor?: AuthenticatedUser,
   ) {
     return this.useCases.getArticleDetail(id, actor?.userId);
@@ -94,7 +95,7 @@ export class ArticleController {
   @HttpCode(HttpStatus.OK)
   async unlock(
     @CurrentUser() actor: AuthenticatedUser,
-    @Param('id') id: string,
+    @Param('id', new ParseUUIDPipe()) id: string,
     @Body(new ZodValidationPipe(unlockArticleSchema)) input: UnlockArticleDto,
   ) {
     return this.useCases.unlockArticle(actor, id, input.pin);

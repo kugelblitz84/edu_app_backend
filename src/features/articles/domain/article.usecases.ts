@@ -11,23 +11,33 @@ import { ScryptSecretHasher } from '../../../core/security/scrypt-secret-hasher.
 import { ScryptSecretVerifier } from '../../../core/security/scrypt-secret-verifier.service';
 import {
   ArticleAuthorRepository,
+  ArticleContentRepository,
   ArticleRepository,
-  type ArticleRecord,
+  type ArticleMetadataRecord,
 } from './article.repository-contract';
 import type {
+  ArticleDetailView,
   ArticleQueryOptions,
   ArticleReviewInput,
-  ArticleDetailView,
+  ArticleSection,
   ArticleSummaryView,
+  ArticleTheme,
   CreateArticleInput,
   PendingArticleQueryOptions,
   UpdateArticleInput,
 } from './article.types';
 
+const DEFAULT_THEME: ArticleTheme = {
+  baseFont: 'Inter',
+  headingFont: 'Playfair Display',
+  containerWidth: 'normal',
+};
+
 @Injectable()
 export class ArticleUseCases {
   constructor(
     private readonly repository: ArticleRepository,
+    private readonly contentRepository: ArticleContentRepository,
     private readonly authors: ArticleAuthorRepository,
     private readonly hasher: ScryptSecretHasher,
     private readonly verifier: ScryptSecretVerifier,
@@ -38,14 +48,11 @@ export class ArticleUseCases {
     input: CreateArticleInput,
   ): Promise<ArticleSummaryView> {
     const user = await this.authors.findById(actor.userId);
-
     if (!user) {
       throw new NotFoundException('User profile not found.');
     }
 
-    const contentId = randomUUID();
     let pinHash: string | undefined;
-
     if (input.accessPolicy === 'PURCHASE') {
       if (!input.pin) {
         throw new BadRequestException(
@@ -55,25 +62,33 @@ export class ArticleUseCases {
       pinHash = await this.hasher.hash(input.pin);
     }
 
-    const data: ArticleRecord = {
-      contentId,
+    const sections =
+      input.sections && input.sections.length > 0
+        ? input.sections
+        : this.buildDefaultSections(input.content);
+    const theme = input.theme ?? DEFAULT_THEME;
+    const plainTextSummary = this.extractPlainText(sections, input.content);
+
+    const created = await this.repository.create({
       title: input.title,
       description: input.description,
-      content: input.content,
       accessPolicy: input.accessPolicy,
       priceAmountMinor: input.priceAmountMinor,
       currency: input.currency ?? 'USD',
       pinHash,
-      status: 'DRAFT',
       tags: input.tags ?? [],
       coverImageUrl: input.coverImageUrl,
       authorId: actor.userId,
-      authorUsername: user.username,
-      authorFullName: user.fullName,
-      unlockedUserIds: [],
-    };
+    });
 
-    const created = await this.repository.create(data);
+    await this.contentRepository.saveContent(created.id, {
+      articleId: created.id,
+      version: 1,
+      theme,
+      sections,
+      plainTextSummary,
+    });
+
     return this.toSummary(created);
   }
 
@@ -82,7 +97,7 @@ export class ArticleUseCases {
     contentId: string,
     input: UpdateArticleInput,
   ): Promise<ArticleSummaryView> {
-    const article = await this.repository.findByContentId(contentId);
+    const article = await this.repository.findById(contentId);
     if (!article) {
       throw new NotFoundException('Article not found.');
     }
@@ -99,11 +114,10 @@ export class ArticleUseCases {
       );
     }
 
-    const updates: Partial<ArticleRecord> = {};
+    const updates: Partial<ArticleMetadataRecord> = {};
     if (input.title !== undefined) updates.title = input.title;
     if (input.description !== undefined)
       updates.description = input.description;
-    if (input.content !== undefined) updates.content = input.content;
     if (input.tags !== undefined) updates.tags = input.tags;
     if (input.coverImageUrl !== undefined)
       updates.coverImageUrl = input.coverImageUrl;
@@ -133,7 +147,38 @@ export class ArticleUseCases {
       updates.pinHash = await this.hasher.hash(input.pin);
     }
 
-    const updated = await this.repository.updateByContentId(contentId, updates);
+    const hasContentUpdates =
+      input.sections !== undefined ||
+      input.theme !== undefined ||
+      input.content !== undefined;
+
+    if (hasContentUpdates) {
+      const existingContent =
+        await this.contentRepository.findByArticleId(contentId);
+      const theme = input.theme ?? existingContent?.theme ?? DEFAULT_THEME;
+      const sections =
+        input.sections ??
+        (input.content !== undefined
+          ? this.buildDefaultSections(input.content)
+          : existingContent?.sections ?? []);
+      const plainTextSummary = this.extractPlainText(
+        sections,
+        input.content ?? existingContent?.plainTextSummary,
+      );
+
+      const nextVersion = (article.contentVersion ?? 1) + 1;
+      await this.contentRepository.saveContent(contentId, {
+        articleId: contentId,
+        version: nextVersion,
+        theme,
+        sections,
+        plainTextSummary,
+      });
+
+      updates.contentVersion = nextVersion;
+    }
+
+    const updated = await this.repository.updateById(contentId, updates);
     if (!updated) {
       throw new NotFoundException('Failed to update article.');
     }
@@ -145,7 +190,7 @@ export class ArticleUseCases {
     actor: AuthenticatedUser,
     contentId: string,
   ): Promise<ArticleSummaryView> {
-    const article = await this.repository.findByContentId(contentId);
+    const article = await this.repository.findById(contentId);
     if (!article) {
       throw new NotFoundException('Article not found.');
     }
@@ -162,13 +207,18 @@ export class ArticleUseCases {
       );
     }
 
-    if (!article.content || article.content.trim().length < 10) {
+    const contentDoc = await this.contentRepository.findByArticleId(contentId);
+    const text =
+      contentDoc?.plainTextSummary ??
+      this.extractPlainText(contentDoc?.sections, article.content);
+
+    if (!text || text.trim().length < 10) {
       throw new BadRequestException(
         'Article content must be at least 10 characters before submitting.',
       );
     }
 
-    const updated = await this.repository.updateByContentId(contentId, {
+    const updated = await this.repository.updateById(contentId, {
       status: 'PENDING_REVIEW',
     });
 
@@ -202,56 +252,64 @@ export class ArticleUseCases {
     contentId: string,
     viewerId?: string,
   ): Promise<ArticleDetailView> {
-    const article = await this.repository.findByContentId(contentId);
+    const article = await this.repository.findById(contentId);
     if (!article) {
       throw new NotFoundException('Article not found.');
     }
 
     const isAuthor = viewerId ? article.authorId === viewerId : false;
     const isUnlocked = viewerId
-      ? article.unlockedUserIds?.includes(viewerId)
+      ? await this.repository.hasUserUnlocked(contentId, viewerId)
       : false;
 
-    // Non-published articles can only be inspected by author or superadmin
     if (article.status !== 'PUBLISHED' && !isAuthor) {
       throw new NotFoundException('Article not found.');
     }
 
     const baseSummary = this.toSummary(article);
 
-    // Free article
-    if (article.accessPolicy === 'FREE') {
-      return {
-        ...baseSummary,
-        content: article.content,
-        access: { canAccess: true, reason: 'FREE' },
-      };
-    }
+    if (article.accessPolicy === 'FREE' || isAuthor || isUnlocked) {
+      const contentDoc =
+        await this.contentRepository.findByArticleId(contentId);
+      const reason =
+        article.accessPolicy === 'FREE'
+          ? 'FREE'
+          : isAuthor
+            ? 'OWNER'
+            : 'UNLOCKED';
+      const source =
+        article.accessPolicy === 'FREE'
+          ? undefined
+          : isAuthor
+            ? 'OWNER'
+            : 'UNLOCKED';
 
-    // Purchase article: Author or Unlocked
-    if (isAuthor || isUnlocked) {
       return {
         ...baseSummary,
-        content: article.content,
+        content: contentDoc?.plainTextSummary ?? article.content,
+        contentPayload: contentDoc ?? undefined,
         access: {
           canAccess: true,
-          source: isAuthor ? 'OWNER' : 'UNLOCKED',
-          reason: isAuthor ? 'OWNER' : 'UNLOCKED',
+          reason,
+          source,
         },
       };
     }
 
-    // Purchase article: Locked (Return synopsis preview only)
+    const contentDoc = await this.contentRepository.findByArticleId(contentId);
+    const summaryText = contentDoc?.plainTextSummary ?? article.description;
     const previewSnippet =
       article.description ||
-      (article.content.length > 300
-        ? `${article.content.slice(0, 300)}...`
-        : article.content);
+      (summaryText && summaryText.length > 300
+        ? `${summaryText.slice(0, 300)}...`
+        : summaryText) ||
+      'This article requires unlocking with a PIN.';
 
     return {
       ...baseSummary,
       previewSnippet,
       content: undefined,
+      contentPayload: undefined,
       access: { canAccess: false, reason: 'PIN_REQUIRED' },
     };
   }
@@ -261,7 +319,7 @@ export class ArticleUseCases {
     contentId: string,
     pin: string,
   ): Promise<{ success: boolean; message: string }> {
-    const article = await this.repository.findByContentId(contentId);
+    const article = await this.repository.findById(contentId);
     if (!article) {
       throw new NotFoundException('Article not found.');
     }
@@ -277,7 +335,11 @@ export class ArticleUseCases {
       };
     }
 
-    if (article.unlockedUserIds?.includes(actor.userId)) {
+    const alreadyUnlocked = await this.repository.hasUserUnlocked(
+      contentId,
+      actor.userId,
+    );
+    if (alreadyUnlocked) {
       return {
         success: true,
         message: 'Article is already unlocked on your account.',
@@ -293,7 +355,7 @@ export class ArticleUseCases {
       throw new ForbiddenException('Invalid PIN code.');
     }
 
-    await this.repository.addUnlockUser(contentId, actor.userId);
+    await this.repository.grantUnlock(contentId, actor.userId, 'PIN');
     return { success: true, message: 'Article unlocked successfully.' };
   }
 
@@ -378,15 +440,17 @@ export class ArticleUseCases {
   async getArticleForAdminReview(
     contentId: string,
   ): Promise<ArticleDetailView> {
-    const article = await this.repository.findByContentId(contentId);
+    const article = await this.repository.findById(contentId);
     if (!article) {
       throw new NotFoundException('Article not found.');
     }
 
+    const contentDoc = await this.contentRepository.findByArticleId(contentId);
     const baseSummary = this.toSummary(article);
     return {
       ...baseSummary,
-      content: article.content,
+      content: contentDoc?.plainTextSummary ?? article.content,
+      contentPayload: contentDoc ?? undefined,
       access: { canAccess: true, reason: 'SUPER_ADMIN' },
     };
   }
@@ -396,7 +460,7 @@ export class ArticleUseCases {
     contentId: string,
     input: ArticleReviewInput,
   ): Promise<ArticleSummaryView> {
-    const article = await this.repository.findByContentId(contentId);
+    const article = await this.repository.findById(contentId);
     if (!article) {
       throw new NotFoundException('Article not found.');
     }
@@ -407,7 +471,7 @@ export class ArticleUseCases {
       );
     }
 
-    const updates: Partial<ArticleRecord> = {
+    const updates: Partial<ArticleMetadataRecord> = {
       reviewedByUserId: adminUser.userId,
       reviewedAt: new Date(),
       reviewNotes: input.reviewNotes,
@@ -422,7 +486,7 @@ export class ArticleUseCases {
       updates.rejectReason = input.rejectReason;
     }
 
-    const updated = await this.repository.updateByContentId(contentId, updates);
+    const updated = await this.repository.updateById(contentId, updates);
     if (!updated) {
       throw new NotFoundException('Failed to finalize review.');
     }
@@ -430,9 +494,58 @@ export class ArticleUseCases {
     return this.toSummary(updated);
   }
 
-  private toSummary(item: ArticleRecord): ArticleSummaryView {
+  private extractPlainText(
+    sections?: ArticleSection[],
+    fallback?: string,
+  ): string {
+    if (!sections || sections.length === 0) {
+      return fallback?.trim() ?? '';
+    }
+
+    const texts: string[] = [];
+    for (const sec of sections) {
+      const allBlocks = [
+        ...(sec.blocks ?? []),
+        ...(sec.columnLeft ?? []),
+        ...(sec.columnRight ?? []),
+      ];
+      for (const b of allBlocks) {
+        if (b.type === 'HEADING' && b.text) {
+          texts.push(b.text);
+        } else if (b.type === 'PARAGRAPH' && b.html) {
+          texts.push(b.html.replace(/<[^>]*>/g, ' '));
+        } else if (b.type === 'QUOTE' && b.text) {
+          texts.push(b.text);
+        }
+      }
+    }
+
+    const fullText = texts.join(' ').replace(/\s+/g, ' ').trim();
+    return fullText || (fallback?.trim() ?? '');
+  }
+
+  private buildDefaultSections(content?: string): ArticleSection[] {
+    if (!content) return [];
+    return [
+      {
+        id: randomUUID(),
+        layout: 'SINGLE_COLUMN',
+        blocks: [
+          {
+            id: randomUUID(),
+            type: 'PARAGRAPH',
+            html: `<p>${content}</p>`,
+          },
+        ],
+      },
+    ];
+  }
+
+  private toSummary(item: ArticleMetadataRecord): ArticleSummaryView {
+    const id = item.id || item.contentId || '';
     return {
-      contentId: item.contentId,
+      id,
+      contentId: id,
       title: item.title,
       description: item.description,
       accessPolicy: item.accessPolicy,

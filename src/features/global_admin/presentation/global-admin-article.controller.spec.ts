@@ -8,8 +8,10 @@ describe('GlobalAdminArticleController', () => {
 
   const adminUser: AuthenticatedUser = {
     userId: 'admin-uuid-1234',
-    roles: ['GLOBAL_ADMIN'],
+    platformRole: 'GLOBAL_ADMIN',
     sessionId: 'session-admin',
+    issuedAt: new Date(),
+    expiresAt: new Date(Date.now() + 3600000),
   };
 
   beforeEach(() => {

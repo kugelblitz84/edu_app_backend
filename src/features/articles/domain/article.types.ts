@@ -1,11 +1,43 @@
+import type {
+  ArticleBlock,
+  ArticleContentData,
+  ArticleFontFamily,
+  ArticleSection,
+  ArticleTextAlignment,
+  ArticleTheme,
+  BlockType,
+  ImagePlacement,
+  SectionLayoutType,
+  SectionStyle,
+} from '../../../../mongoose/models/article.model';
+
+export type {
+  ArticleBlock,
+  ArticleContentData,
+  ArticleFontFamily,
+  ArticleSection,
+  ArticleTextAlignment,
+  ArticleTheme,
+  BlockType,
+  ImagePlacement,
+  SectionLayoutType,
+  SectionStyle,
+};
+
 export type ArticleAccessPolicy = 'FREE' | 'PURCHASE';
 export type ArticleStatus =
-  'DRAFT' | 'PENDING_REVIEW' | 'PUBLISHED' | 'REJECTED' | 'ARCHIVED';
+  | 'DRAFT'
+  | 'PENDING_REVIEW'
+  | 'PUBLISHED'
+  | 'REJECTED'
+  | 'ARCHIVED';
 
 export interface CreateArticleInput {
   title: string;
   description?: string;
-  content: string;
+  content?: string;
+  theme?: ArticleTheme;
+  sections?: ArticleSection[];
   accessPolicy: ArticleAccessPolicy;
   priceAmountMinor?: number;
   currency?: string;
@@ -18,6 +50,8 @@ export interface UpdateArticleInput {
   title?: string;
   description?: string;
   content?: string;
+  theme?: ArticleTheme;
+  sections?: ArticleSection[];
   accessPolicy?: ArticleAccessPolicy;
   priceAmountMinor?: number;
   currency?: string;
@@ -48,7 +82,8 @@ export interface PendingArticleQueryOptions {
 }
 
 export interface ArticleSummaryView {
-  contentId: string;
+  id: string;
+  contentId: string; // Alias for backward compatibility
   title: string;
   description?: string;
   accessPolicy: ArticleAccessPolicy;
@@ -64,7 +99,8 @@ export interface ArticleSummaryView {
 }
 
 export interface ArticleDetailView extends ArticleSummaryView {
-  content?: string;
+  content?: string; // Plaintext or HTML fallback
+  contentPayload?: ArticleContentData; // Full MongoDB layout and blocks
   previewSnippet?: string;
   access: {
     canAccess: boolean;
