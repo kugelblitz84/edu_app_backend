@@ -10,10 +10,12 @@ const config: AppConfig = {
   corsOrigins: [],
   databaseUrl: 'postgresql://localhost/test',
   mongodbUrl: 'mongodb://localhost/test',
+  realtime: {},
   auth: {
     accessTokenSecret: 'test-access-token-secret-at-least-32-characters',
     accessTokenTtlSeconds: 900,
     refreshTokenTtlSeconds: 2_592_000,
+    cookieSameSite: 'lax',
     examInvitationTokenSecret:
       'test-exam-invitation-secret-at-least-32-characters',
     examInvitationTokenTtlSeconds: 604_800,
@@ -23,6 +25,7 @@ const config: AppConfig = {
     ipRegionHeader: 'cf-ipcountry',
   },
   mail: { port: 587, secure: false, from: 'test@example.com' },
+  payment: { sslCommerzIsLive: false },
   passwordHashing: {
     keyLength: 64,
     cost: 16_384,

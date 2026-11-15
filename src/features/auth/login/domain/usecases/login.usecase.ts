@@ -79,6 +79,7 @@ export class LoginUseCase {
       },
       accessToken: tokens.accessToken,
       refreshToken: tokens.refreshToken,
+      refreshTokenExpiresAt: tokens.refreshTokenExpiresAt,
       tokenType: 'Bearer',
       expiresIn: tokens.accessTokenExpiresIn,
     };

@@ -42,6 +42,9 @@ export class SessionService {
     const sessionId = randomUUID();
     const refreshToken = this.generateRefreshToken(sessionId);
     const refreshTokenDigest = this.digest(refreshToken);
+    const expiresAt = new Date(
+      Date.now() + this.config.auth.refreshTokenTtlSeconds * 1000,
+    );
 
     await this.prisma.authSession.create({
       data: {
@@ -49,16 +52,14 @@ export class SessionService {
         userId: user.userId,
         refreshTokenDigest,
         refreshTokens: { create: { digest: refreshTokenDigest } },
-        expiresAt: new Date(
-          Date.now() + this.config.auth.refreshTokenTtlSeconds * 1000,
-        ),
+        expiresAt,
         ipAddress: this.ipAddress(metadata.ipAddress),
         userAgent: this.userAgent(metadata.userAgent),
       },
       select: { id: true },
     });
 
-    return this.tokensFor(user, sessionId, refreshToken);
+    return this.tokensFor(user, sessionId, refreshToken, expiresAt);
   }
 
   async rotate(
@@ -152,7 +153,24 @@ export class SessionService {
       },
       session.id,
       nextRefreshToken,
+      session.expiresAt,
     );
+  }
+
+  async revokeByRefreshToken(refreshToken: string): Promise<void> {
+    const sessionId = this.readSessionId(refreshToken);
+    const storedToken = await this.prisma.authRefreshToken.findUnique({
+      where: { digest: this.digest(refreshToken) },
+      select: { sessionId: true },
+    });
+
+    if (storedToken?.sessionId === sessionId) {
+      await this.revoke(sessionId);
+    }
+  }
+
+  sessionIdFromRefreshToken(refreshToken: string): string {
+    return this.readSessionId(refreshToken);
   }
 
   async authenticateAccessToken(
@@ -247,11 +265,13 @@ export class SessionService {
     user: SessionUser,
     sessionId: string,
     refreshToken: string,
+    refreshTokenExpiresAt: Date,
   ): Promise<AuthTokenPair> {
     return {
       accessToken: await this.accessTokens.generate(user, sessionId),
       refreshToken,
       accessTokenExpiresIn: this.accessTokens.expiresIn,
+      refreshTokenExpiresAt,
     };
   }
 

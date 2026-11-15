@@ -131,7 +131,12 @@ class InMemorySessionService {
       accessToken: 'eyJhbGciOiJIUzI1NiJ9.eyJ0eXBlIjoiYWNjZXNzIn0.signature',
       refreshToken: `${randomUUID()}.${randomBytes(32).toString('base64url')}`,
       accessTokenExpiresIn: 900,
+      refreshTokenExpiresAt: new Date(Date.now() + 2_592_000_000),
     });
+  }
+
+  sessionIdFromRefreshToken(refreshToken: string): string {
+    return refreshToken.split('.')[0];
   }
 }
 
@@ -278,12 +283,14 @@ describe('Auth module (e2e)', () => {
       tokenType: 'Bearer',
     });
     expect(typeof loggedInUser.accessToken).toBe('string');
-    expect(typeof loggedInUser.refreshToken).toBe('string');
+    expect(typeof loggedInUser.csrfToken).toBe('string');
     expect(typeof loggedInUser.expiresIn).toBe('number');
     expectJwtLikeToken(loggedInUser.accessToken);
-    expect(loggedInUser.refreshToken).toMatch(
-      /^[0-9a-f-]{36}\.[A-Za-z0-9_-]{43}$/i,
-    );
+    expect(loggedInUser).not.toHaveProperty('refreshToken');
+    const setCookies = String(loginResponse.headers['set-cookie']);
+    expect(setCookies).toContain('__Secure-refresh_token=');
+    expect(setCookies).toContain('HttpOnly');
+    expect(setCookies).toContain('Secure');
     expect(loggedInUser.expiresIn).toBeGreaterThan(0);
     expect(repository.getByUsername(user.username)?.lastLoginAt).toBeInstanceOf(
       Date,

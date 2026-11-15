@@ -29,6 +29,7 @@ export interface AuthTokenPair {
   accessToken: string;
   refreshToken: string;
   accessTokenExpiresIn: number;
+  refreshTokenExpiresAt: Date;
 }
 
 export interface AccessTokenPayload {

@@ -63,6 +63,7 @@ class FakeTokenGenerator implements Pick<SessionService, 'create'> {
       accessToken: 'access-token',
       refreshToken: 'refresh-token',
       accessTokenExpiresIn: 900,
+      refreshTokenExpiresAt: new Date('2026-12-01T00:00:00.000Z'),
     });
   }
 }

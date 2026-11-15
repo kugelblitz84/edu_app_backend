@@ -10,6 +10,7 @@ export interface LoggedInUser {
   };
   accessToken: string;
   refreshToken: string;
+  refreshTokenExpiresAt: Date;
   tokenType: 'Bearer';
   expiresIn: number;
 }

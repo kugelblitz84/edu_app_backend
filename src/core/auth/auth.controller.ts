@@ -1,38 +1,25 @@
 import {
-  Body,
   Controller,
+  Get,
   HttpCode,
   HttpStatus,
   Post,
   Req,
+  Res,
   UnauthorizedException,
 } from '@nestjs/common';
-import type { Request } from 'express';
-import { z } from 'zod';
-import { ZodValidationPipe } from '../validator/zod-validation.pipe';
-import type { AuthenticatedUser } from './auth.types';
-import { CurrentUser } from './decorators/current-user.decorator';
+import type { Request, Response } from 'express';
 import { Public } from './decorators/public.decorator';
+import { AuthCookieService } from './services/auth-cookie.service';
 import {
   InvalidRefreshTokenError,
   SessionService,
 } from './services/session.service';
 import { RateLimitService } from './services/rate-limit.service';
 
-const refreshTokenRequestSchema = z
-  .object({
-    refreshToken: z
-      .string({ error: 'Refresh token is required.' })
-      .min(1, 'Refresh token is required.')
-      .max(128, 'Refresh token is invalid.'),
-  })
-  .strict();
-
-type RefreshTokenRequestDto = z.infer<typeof refreshTokenRequestSchema>;
-
 export interface RefreshTokenResponseDto {
   accessToken: string;
-  refreshToken: string;
+  csrfToken: string;
   tokenType: 'Bearer';
   expiresIn: number;
 }
@@ -42,21 +29,65 @@ export class AuthController {
   constructor(
     private readonly sessions: SessionService,
     private readonly rateLimits: RateLimitService,
+    private readonly authCookies: AuthCookieService,
   ) {}
 
+  @Public()
   @Post('logout')
   @HttpCode(HttpStatus.NO_CONTENT)
-  async logout(@CurrentUser() currentUser: AuthenticatedUser): Promise<void> {
-    await this.sessions.revoke(currentUser.sessionId, currentUser.userId);
+  async logout(
+    @Req() request: Request,
+    @Res({ passthrough: true }) response: Response,
+  ): Promise<void> {
+    this.authCookies.assertAllowedOrigin(request);
+    const refreshToken = this.authCookies.readRefreshToken(request);
+
+    if (refreshToken) {
+      try {
+        const sessionId = this.sessions.sessionIdFromRefreshToken(refreshToken);
+        this.authCookies.assertCsrfToken(request, sessionId);
+        await this.sessions.revokeByRefreshToken(refreshToken);
+      } catch (error) {
+        if (!(error instanceof InvalidRefreshTokenError)) throw error;
+      }
+    }
+
+    this.authCookies.clearRefreshToken(response);
+    response.setHeader('Cache-Control', 'no-store');
+  }
+
+  @Public()
+  @Get('csrf')
+  @HttpCode(HttpStatus.OK)
+  csrf(
+    @Req() request: Request,
+    @Res({ passthrough: true }) response: Response,
+  ): { csrfToken: string } {
+    this.authCookies.assertAllowedOrigin(request, false);
+    const refreshToken = this.authCookies.readRefreshToken(request);
+    if (!refreshToken) {
+      throw new UnauthorizedException('A valid refresh token is required.');
+    }
+
+    try {
+      const sessionId = this.sessions.sessionIdFromRefreshToken(refreshToken);
+      response.setHeader('Cache-Control', 'no-store');
+      return { csrfToken: this.authCookies.issueCsrfToken(sessionId) };
+    } catch (error) {
+      if (error instanceof InvalidRefreshTokenError) {
+        this.authCookies.clearRefreshToken(response);
+        throw new UnauthorizedException('A valid refresh token is required.');
+      }
+      throw error;
+    }
   }
 
   @Public()
   @Post('refresh')
   @HttpCode(HttpStatus.OK)
   async refresh(
-    @Body(new ZodValidationPipe(refreshTokenRequestSchema))
-    input: RefreshTokenRequestDto,
     @Req() request: Request,
+    @Res({ passthrough: true }) response: Response,
   ): Promise<RefreshTokenResponseDto> {
     await this.rateLimits.enforce(
       'auth-refresh-ip',
@@ -65,20 +96,37 @@ export class AuthController {
       15 * 60_000,
       'Too many refresh attempts. Please try again later.',
     );
+    this.authCookies.assertAllowedOrigin(request);
+
+    const refreshToken = this.authCookies.readRefreshToken(request);
+    if (!refreshToken) {
+      throw new UnauthorizedException('A valid refresh token is required.');
+    }
+
     try {
-      const tokens = await this.sessions.rotate(input.refreshToken, {
+      const sessionId = this.sessions.sessionIdFromRefreshToken(refreshToken);
+      this.authCookies.assertCsrfToken(request, sessionId);
+      const tokens = await this.sessions.rotate(refreshToken, {
         ipAddress: request.ip,
         userAgent: request.get('user-agent'),
       });
+
+      this.authCookies.setRefreshToken(
+        response,
+        tokens.refreshToken,
+        tokens.refreshTokenExpiresAt,
+      );
+      response.setHeader('Cache-Control', 'no-store');
       return {
         accessToken: tokens.accessToken,
-        refreshToken: tokens.refreshToken,
+        csrfToken: this.authCookies.issueCsrfToken(sessionId),
         tokenType: 'Bearer',
         expiresIn: tokens.accessTokenExpiresIn,
       };
     } catch (error) {
       if (error instanceof InvalidRefreshTokenError) {
-        throw new UnauthorizedException(error.message);
+        this.authCookies.clearRefreshToken(response);
+        throw new UnauthorizedException('A valid refresh token is required.');
       }
       throw error;
     }

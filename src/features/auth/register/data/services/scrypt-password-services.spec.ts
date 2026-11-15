@@ -7,10 +7,13 @@ const config: AppConfig = {
   port: 3000,
   corsOrigins: [],
   databaseUrl: 'postgres://unused',
+  mongodbUrl: 'mongodb://localhost/test',
+  realtime: {},
   auth: {
     accessTokenSecret: 'a'.repeat(32),
     accessTokenTtlSeconds: 900,
     refreshTokenTtlSeconds: 2_592_000,
+    cookieSameSite: 'lax',
     examInvitationTokenSecret: 'b'.repeat(32),
     examInvitationTokenTtlSeconds: 604_800,
     issuer: 'edu-app-api',
@@ -23,6 +26,7 @@ const config: AppConfig = {
     secure: false,
     from: 'no-reply@example.com',
   },
+  payment: { sslCommerzIsLive: false },
   passwordHashing: {
     keyLength: 32,
     cost: 16_384,

@@ -19,8 +19,23 @@ export const loginRequestSchema = z
 
 export type LoginRequestDto = z.infer<typeof loginRequestSchema>;
 
-export type LoginResponseDto = LoggedInUser;
+export interface LoginResponseDto {
+  user: LoggedInUser['user'];
+  accessToken: string;
+  csrfToken: string;
+  tokenType: 'Bearer';
+  expiresIn: number;
+}
 
-export function toLoginResponseDto(user: LoggedInUser): LoginResponseDto {
-  return user;
+export function toLoginResponseDto(
+  user: LoggedInUser,
+  csrfToken: string,
+): LoginResponseDto {
+  return {
+    user: user.user,
+    accessToken: user.accessToken,
+    csrfToken,
+    tokenType: user.tokenType,
+    expiresIn: user.expiresIn,
+  };
 }

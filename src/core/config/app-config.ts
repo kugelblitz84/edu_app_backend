@@ -3,6 +3,7 @@ import 'dotenv/config';
 export const APP_CONFIG = Symbol('APP_CONFIG');
 
 export type NodeEnvironment = 'development' | 'test' | 'production';
+export type AuthCookieSameSite = 'lax' | 'strict' | 'none';
 
 export interface AppConfig {
   nodeEnv: NodeEnvironment;
@@ -17,6 +18,7 @@ export interface AppConfig {
     accessTokenSecret: string;
     accessTokenTtlSeconds: number;
     refreshTokenTtlSeconds: number;
+    cookieSameSite: AuthCookieSameSite;
     examInvitationTokenSecret: string;
     examInvitationTokenTtlSeconds: number;
     issuer: string;
@@ -120,6 +122,14 @@ function parseNodeEnvironment(value: string | undefined): NodeEnvironment {
   }
 
   return 'development';
+}
+
+function parseAuthCookieSameSite(value: string | undefined): AuthCookieSameSite {
+  const sameSite = value?.trim().toLowerCase() || 'lax';
+  if (sameSite === 'lax' || sameSite === 'strict' || sameSite === 'none') {
+    return sameSite;
+  }
+  throw new Error('AUTH_COOKIE_SAME_SITE must be lax, strict, or none.');
 }
 
 function parsePort(value: string | undefined): number {
@@ -235,6 +245,9 @@ export function loadAppConfig(): AppConfig {
         'JWT_REFRESH_TTL_SECONDS',
         process.env.JWT_REFRESH_TTL_SECONDS,
         30 * 24 * 60 * 60,
+      ),
+      cookieSameSite: parseAuthCookieSameSite(
+        process.env.AUTH_COOKIE_SAME_SITE,
       ),
       examInvitationTokenSecret,
       examInvitationTokenTtlSeconds: parsePositiveInteger(
